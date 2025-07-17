@@ -2,8 +2,8 @@
 /* eslint-disable no-alert */
 
 // Import dependencies as ES modules for MV3
-import * as spacesService from './spacesService.js';
-import * as utils from './utils.js';
+import spacesService from './spacesService.js';
+import { utils } from './utils.js';
 
 /* spaces
  * Copyright (C) 2015 Dean Oemcke
@@ -15,6 +15,21 @@ export const spaces = (() => {
     let spacesOpenWindowId = false;
     const noop = () => {};
     const debug = false;
+
+    // Utility function to clean and validate parameters
+    // This function was present in the original MV2 version but was lost during conversion
+    const _cleanParameter = (param) => {
+        if (typeof param === 'number') {
+            return param;
+        }
+        if (param === 'false') {
+            return false;
+        }
+        if (param === 'true') {
+            return true;
+        }
+        return parseInt(param, 10);
+    };
 
     // LISTENERS
 
@@ -241,6 +256,13 @@ export const spaces = (() => {
                 }
                 return false;
 
+            case 'generatePopupParams':
+                // Handle popup parameter generation for switcher and mover views
+                generatePopupParams(request.actionType, request.tabUrl).then(params => {
+                    sendResponse(params);
+                });
+                return true; // Allow async response
+
             case 'requestShowSwitcher':
                 showSpacesSwitchWindow();
                 return false;
@@ -415,11 +437,11 @@ export const spaces = (() => {
         let url;
 
         if (editMode && windowId) {
-            url = chrome.extension.getURL(
+            url = chrome.runtime.getURL(
                 `spaces.html#windowId=${windowId}&editMode=true`
             );
         } else {
-            url = chrome.extension.getURL('spaces.html');
+            url = chrome.runtime.getURL('spaces.html');
         }
 
         // if spaces open window already exists then just give it focus (should be up to date)
@@ -491,7 +513,7 @@ export const spaces = (() => {
 
     function createOrShowSpacesPopupWindow(action, tabUrl) {
         generatePopupParams(action, tabUrl).then(params => {
-            const popupUrl = `${chrome.extension.getURL(
+            const popupUrl = `${chrome.runtime.getURL(
                 'popup.html'
             )}#opener=bg&${params}`;
             // if spaces  window already exists

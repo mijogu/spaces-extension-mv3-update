@@ -8,7 +8,7 @@ import * as dbService from './dbService.js';
  */
 
 // Convert to ES module for MV3
-export const spacesService = {
+const spacesService = {
     tabHistoryUrlMap: {},
     closedWindowIds: {},
     sessions: [],
@@ -714,3 +714,6 @@ export const spacesService = {
         });
     },
 };
+
+// Default export for ES modules
+export default spacesService;
