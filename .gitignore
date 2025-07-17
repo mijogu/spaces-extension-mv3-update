@@ -1,0 +1,42 @@
+# Node modules
+node_modules/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Jest coverage
+coverage/
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Build output (if any)
+dist/
+build/
+
+# Chrome extension artifacts
+*.crx
+*.pem
+
+# VSCode and editor folders
+.vscode/
+.idea/
+
+# Test output
+*.log
+
+# Cursor/AI artifacts
+.cursor/
+
+# Misc
+.env
+.env.*
+
+# Ignore test snapshots (if not used)
+__snapshots__/
+
+# Ignore local test results
+*.local.json 

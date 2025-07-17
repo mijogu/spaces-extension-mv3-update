@@ -1,13 +1,16 @@
 /* eslint-disable no-restricted-globals */
 /* eslint-disable no-alert */
-/* global chrome spacesService */
+
+// Import dependencies as ES modules for MV3
+import * as spacesService from './spacesService.js';
+import * as utils from './utils.js';
 
 /* spaces
  * Copyright (C) 2015 Dean Oemcke
  */
 
-// eslint-disable-next-line no-unused-vars, no-var
-var spaces = (() => {
+// Convert to ES module - export the spaces object
+export const spaces = (() => {
     let spacesPopupWindowId = false;
     let spacesOpenWindowId = false;
     const noop = () => {};
@@ -359,20 +362,8 @@ var spaces = (() => {
                 return false;
         }
     });
-    function _cleanParameter(param) {
-        if (typeof param === 'number') {
-            return param;
-        }
-        if (param === 'false') {
-            return false;
-        }
-        if (param === 'true') {
-            return true;
-        }
-        return parseInt(param, 10);
-    }
 
-    // add listeners for keyboard commands
+    // add listeners for keyboard shortcuts
 
     chrome.commands.onCommand.addListener(command => {
         // handle showing the move tab popup (tab.html)
@@ -1051,6 +1042,7 @@ var spaces = (() => {
         callback(true);
     }
 
+    // Return the spaces object with all public methods
     return {
         requestSpaceFromWindowId,
         requestCurrentSpace,
@@ -1059,5 +1051,5 @@ var spaces = (() => {
     };
 })();
 
-spacesService.initialiseSpaces();
-spacesService.initialiseTabHistory();
+// TODO: Add proper error handling for service worker lifecycle
+// TODO: Consider implementing background sync for better offline support

@@ -1,11 +1,14 @@
-/* global chrome, dbService */
+/* global chrome */
+
+// Import dependencies as ES modules for MV3
+import * as dbService from './dbService.js';
 
 /* spaces
  * Copyright (C) 2015 Dean Oemcke
  */
 
-// eslint-disable-next-line no-var
-var spacesService = {
+// Convert to ES module for MV3
+export const spacesService = {
     tabHistoryUrlMap: {},
     closedWindowIds: {},
     sessions: [],

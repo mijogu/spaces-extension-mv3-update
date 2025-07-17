@@ -4,8 +4,9 @@
 	<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css">
 	<link href='https://fonts.googleapis.com/css?family=Open+Sans:700,300,600,400' rel='stylesheet' type='text/css'>
 	<link type="text/css" href="css/popup.css" rel="stylesheet">
-	<script type="text/javascript" src="js/popup.js"></script>
-	<script type="text/javascript" src="js/spacesRenderer.js"></script>
+	<!-- Updated to use ES modules for MV3 -->
+	<script type="module" src="js/popup.js"></script>
+	<script type="module" src="js/spacesRenderer.js"></script>
 
 </head>
 <body>
@@ -54,6 +55,23 @@
 		</div>
 	</script>
 
+	<!-- Added moverTemplate for move view -->
+	<script type="text/html" id="moverTemplate">
+		<div class="mainContent">
+			<div class="contentBody">
+				<div id="tabInfo">
+					<span id="tabTitle"></span>
+					<span id="tabUrl"></span>
+				</div>
+				<form id="spaceSelectForm">
+					<input id="sessionsInput" list="sessionsList" type="text" autocomplete="off" placeholder="Move tab to.." />
+				</form>
+				<div id="spacesList">
+					<div id="savedSpaces"></div>
+				</div>
+			</div>
+		</div>
+	</script>
 
 	<div id="header">
 		<span>Active space: </span><input type="text" id="activeSpaceTitle"></input>

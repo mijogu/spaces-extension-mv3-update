@@ -1,6 +1,7 @@
 /* global chrome  */
-// eslint-disable-next-line no-var, no-unused-vars
-var utils = {
+
+// Convert to ES module for MV3
+export const utils = {
     getHashVariable: (key, urlStr) => {
         const valuesByKey = {};
         const keyPairRegEx = /^(.+)=(.+)/;
@@ -61,3 +62,6 @@ var utils = {
         });
     },
 };
+
+// TODO: Add more utility functions for better code organization
+// TODO: Consider adding input validation and error handling

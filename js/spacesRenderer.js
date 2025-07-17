@@ -1,5 +1,5 @@
-// eslint-disable-next-line no-var
-var spacesRenderer = {
+// Convert to ES module for MV3
+export const spacesRenderer = {
     nodes: {},
     maxSuggestions: 10,
     oneClickMode: false,
@@ -202,52 +202,54 @@ var spacesRenderer = {
             }
         });
 
-        // show the 'create new' div if exact match not found
-        if (spacesRenderer.nodes.newSpace) {
-            if (!exactMatch && query.length > 0) {
+        // show/hide new space option
+        const newSpaceEl = spacesRenderer.nodes.newSpace;
+        if (newSpaceEl) {
+            if (query && !exactMatch) {
+                newSpaceEl.style.display = 'flex';
+                newSpaceEl.style.visibility = 'visible';
                 spacesRenderer.nodes.newSpaceTitle.innerHTML = query;
-                spacesRenderer.nodes.newSpace.setAttribute(
-                    'data-spaceName',
-                    query
-                );
-                spacesRenderer.nodes.newSpace.className = 'space';
-                spacesRenderer.nodes.newSpace.style.display = 'flex';
-                spacesRenderer.nodes.newSpace.style.visibility = 'visible';
             } else {
-                spacesRenderer.nodes.newSpace.style.display = 'none';
-                spacesRenderer.nodes.newSpace.style.visibility = 'hidden';
+                newSpaceEl.style.display = 'none';
+                newSpaceEl.style.visibility = 'hidden';
             }
         }
 
-        // highlight the first space el in the visible list
-        spacesRenderer.selectSpace(spacesRenderer.getFirstSpaceEl(), false);
+        // select first visible space
+        const firstVisibleSpace = spacesRenderer.getFirstSpaceEl();
+        if (firstVisibleSpace) {
+            spacesRenderer.selectSpace(firstVisibleSpace, false);
+        }
     },
 
     addEventListeners: () => {
-        spacesRenderer.nodes.moveInput.parentElement.parentElement.onkeyup = e => {
-            // listen for 'up' key
+        // add keyboard navigation
+        spacesRenderer.nodes.moveInput.onkeydown = e => {
             if (e.keyCode === 38) {
+                // up arrow
+                e.preventDefault();
                 spacesRenderer.handleSelectionNavigation('up');
-
-                // listen for 'down' key
             } else if (e.keyCode === 40) {
+                // down arrow
+                e.preventDefault();
                 spacesRenderer.handleSelectionNavigation('down');
-
-                // else treat as text input (only trigger on alphanumeric, delete or backspace keys when modifiers are not down)
-            } else if (
-                !e.altKey &&
-                !e.ctrlKey &&
-                (e.keyCode === 46 ||
-                    e.keyCode === 8 ||
-                    (e.keyCode >= 48 && e.keyCode <= 90))
-            ) {
-                spacesRenderer.updateSpacesList();
+            } else if (e.keyCode === 13) {
+                // enter key
+                e.preventDefault();
+                const selectedSpaceEl = document.querySelector('.space.selected');
+                if (selectedSpaceEl) {
+                    selectedSpaceEl.click();
+                }
             }
         };
 
-        if (spacesRenderer.nodes.newSpace) {
-            spacesRenderer.nodes.newSpace.onclick =
-                spacesRenderer.handleSpaceClick;
-        }
+        // add input event for filtering
+        spacesRenderer.nodes.moveInput.oninput = () => {
+            spacesRenderer.updateSpacesList();
+        };
     },
 };
+
+// TODO: Add proper error handling for DOM operations
+// TODO: Consider adding accessibility improvements (ARIA labels, keyboard navigation)
+// TODO: Add performance optimizations for large space lists

@@ -1,5 +1,8 @@
 /* global chrome spacesRenderer */
 
+// Import utils for hash variable parsing
+import { utils } from './utils.js';
+
 (() => {
     const UNSAVED_SESSION = '(unnamed window)';
     const NO_HOTKEY = 'no hotkey set';
@@ -16,7 +19,8 @@
      */
 
     document.addEventListener('DOMContentLoaded', async () => {
-        const { utils, spaces } = chrome.extension.getBackgroundPage();
+        // BREAKING_CHANGE: chrome.extension.getBackgroundPage() is not supported in MV3
+        // Using chrome.runtime.sendMessage instead to communicate with service worker
         const url = utils.getHashVariable('url', window.location.href);
         globalUrl = url !== '' ? decodeURIComponent(url) : false;
         const windowId = utils.getHashVariable(
@@ -33,14 +37,19 @@
             sessionName && sessionName !== 'false' ? sessionName : false;
         const action = utils.getHashVariable('action', window.location.href);
 
+        // Request space data from service worker
         const requestSpacePromise = globalWindowId
-            ? new Promise(resolve =>
-                  spaces.requestSpaceFromWindowId(
-                      parseInt(globalWindowId, 10),
-                      resolve
-                  )
-              )
-            : new Promise(resolve => spaces.requestCurrentSpace(resolve));
+            ? new Promise(resolve => {
+                  chrome.runtime.sendMessage({
+                      action: 'requestSpaceDetail',
+                      windowId: parseInt(globalWindowId, 10)
+                  }, resolve);
+              })
+            : new Promise(resolve => {
+                  chrome.runtime.sendMessage({
+                      action: 'requestSpaceDetail'
+                  }, resolve);
+              });
 
         requestSpacePromise.then(space => {
             globalCurrentSpace = space;
@@ -100,7 +109,6 @@
     }
 
     function handleCloseAction() {
-        const { utils } = chrome.extension.getBackgroundPage();
         const opener = utils.getHashVariable('opener', window.location.href);
         if (opener && opener === 'bg') {
             chrome.runtime.sendMessage({
@@ -116,8 +124,8 @@
      */
 
     function renderMainCard() {
-        const { spaces } = chrome.extension.getBackgroundPage();
-        spaces.requestHotkeys(hotkeys => {
+        // Request hotkeys from service worker
+        chrome.runtime.sendMessage({ action: 'requestHotkeys' }, hotkeys => {
             document.querySelector(
                 '#switcherLink .hotkey'
             ).innerHTML = hotkeys.switchCode ? hotkeys.switchCode : NO_HOTKEY;
@@ -147,22 +155,28 @@
         document
             .querySelector('#switcherLink .optionText')
             .addEventListener('click', () => {
-                spaces.generatePopupParams('switch').then(params => {
+                // Request popup params from service worker
+                chrome.runtime.sendMessage({
+                    action: 'generatePopupParams',
+                    actionType: 'switch'
+                }, params => {
                     if (!params) return;
                     window.location.hash = params;
                     window.location.reload();
                 });
-                // renderSwitchCard()
             });
         document
             .querySelector('#moverLink .optionText')
             .addEventListener('click', () => {
-                spaces.generatePopupParams('move').then(params => {
+                // Request popup params from service worker
+                chrome.runtime.sendMessage({
+                    action: 'generatePopupParams',
+                    actionType: 'move'
+                }, params => {
                     if (!params) return;
                     window.location.hash = params;
                     window.location.reload();
                 });
-                // renderMoveCard()
             });
     }
 
@@ -253,182 +267,98 @@
     function renderMoveCard() {
         document.getElementById(
             'popupContainer'
-        ).innerHTML = document.getElementById('moveTemplate').innerHTML;
+        ).innerHTML = document.getElementById('moverTemplate').innerHTML;
 
-        // initialise global handles to key elements (singletons)
-        // nodes.home = document.getElementById('spacesHome');
-        nodes.body = document.querySelector('body');
-        nodes.spaceEditButton = document.getElementById('spaceEdit');
-        nodes.moveForm = document.getElementById('spaceSelectForm');
-        nodes.moveInput = document.getElementById('sessionsInput');
-        nodes.activeSpaceTitle = document.getElementById('activeSpaceTitle');
-        nodes.activeTabTitle = document.getElementById('activeTabTitle');
-        nodes.activeTabFavicon = document.getElementById('activeTabFavicon');
-        nodes.okButton = document.getElementById('moveBtn');
-        nodes.cancelButton = document.getElementById('cancelBtn');
+        updateTabDetails();
 
-        // nodes.home.setAttribute('href', chrome.extension.getURL('spaces.html'));
-
-        nodes.moveForm.onsubmit = e => {
+        document.getElementById('spaceSelectForm').onsubmit = e => {
             e.preventDefault();
             handleSelectAction();
         };
 
-        nodes.body.onkeyup = e => {
-            // highlight ok button when you start typing
-            if (nodes.moveInput.value.length > 0) {
-                nodes.okButton.className = 'button okBtn selected';
-            } else {
-                nodes.okButton.className = 'button okBtn';
-            }
-
-            // listen for escape key
-            if (e.keyCode === 27) {
-                handleCloseAction();
-            }
-        };
-
-        nodes.spaceEditButton.onclick = () => {
-            handleEditSpace();
-        };
-        nodes.okButton.onclick = () => {
-            handleSelectAction();
-        };
-        nodes.cancelButton.onclick = () => {
-            handleCloseAction();
-        };
-
-        // update currentSpaceDiv
-        // nodes.windowTitle.innerHTML = "Current space: " + (globalSessionName ? globalSessionName : 'unnamed');
-        nodes.activeSpaceTitle.innerHTML = globalSessionName || '(unnamed)';
-        // selectSpace(nodes.activeSpace);
-
-        updateTabDetails();
-
-        chrome.runtime.sendMessage(
-            {
-                action: 'requestAllSpaces',
-            },
-            spaces => {
-                // remove currently visible space
-                const filteredSpaces = spaces.filter(space => {
-                    return `${space.windowId}` !== globalWindowId;
-                });
-                spacesRenderer.initialise(5, false);
-                spacesRenderer.renderSpaces(filteredSpaces);
-
-                const allSpaceEls = document.querySelectorAll('.space');
-                Array.prototype.forEach.call(allSpaceEls, el => {
-                    // eslint-disable-next-line no-param-reassign
-                    const existingClickHandler = el.onclick;
-                    el.onclick = e => {
-                        existingClickHandler(e);
-                        handleSelectAction();
-                    };
-                });
-            }
-        );
+        const allSpaceEls = document.querySelectorAll('.space');
+        Array.prototype.forEach.call(allSpaceEls, el => {
+            // eslint-disable-next-line no-param-reassign
+            el.onclick = () => {
+                handleSelectAction(el);
+            };
+        });
     }
 
     function updateTabDetails() {
-        let faviconSrc;
-
-        // if we are working with an open chrome tab
-        if (globalTabId.length > 0) {
+        if (globalTabId) {
             chrome.runtime.sendMessage(
-                {
-                    action: 'requestTabDetail',
-                    tabId: globalTabId,
-                },
+                { action: 'requestTabDetail', tabId: globalTabId },
                 tab => {
                     if (tab) {
-                        nodes.activeTabTitle.innerHTML = tab.title;
-
-                        // try to get best favicon url path
-                        if (
-                            tab.favIconUrl &&
-                            tab.favIconUrl.indexOf('chrome://theme') < 0
-                        ) {
-                            faviconSrc = tab.favIconUrl;
-                        } else {
-                            faviconSrc = `chrome://favicon/${tab.url}`;
-                        }
-                        nodes.activeTabFavicon.setAttribute('src', faviconSrc);
-
-                        nodes.moveInput.setAttribute(
-                            'placeholder',
-                            'Move tab to..'
-                        );
-
-                        // nodes.windowTitle.innerHTML = tab.title;
-                        // nodes.windowFavicon.setAttribute('href', faviconSrc);
+                        document.getElementById('tabTitle').innerHTML = tab.title;
+                        document.getElementById('tabUrl').innerHTML = tab.url;
                     }
                 }
             );
-
-            // else if we are dealing with a url only
-        } else if (globalUrl) {
-            const cleanUrl =
-                globalUrl.indexOf('://') > 0
-                    ? globalUrl.substr(
-                          globalUrl.indexOf('://') + 3,
-                          globalUrl.length
-                      )
-                    : globalUrl;
-            nodes.activeTabTitle.innerHTML = cleanUrl;
-            nodes.activeTabFavicon.setAttribute('src', '/img/new.png');
-
-            nodes.moveInput.setAttribute('placeholder', 'Add tab to..');
         }
+
+        chrome.runtime.sendMessage({ action: 'requestAllSpaces' }, spaces => {
+            spacesRenderer.initialise(8, true);
+            spacesRenderer.renderSpaces(spaces);
+        });
     }
 
-    function handleSelectAction() {
-        const selectedSpaceEl = document.querySelector('.space.selected');
+    function handleSelectAction(selectedSpaceEl) {
+        if (!selectedSpaceEl) {
+            selectedSpaceEl = getSelectedSpace();
+        }
+
+        if (!selectedSpaceEl) {
+            return;
+        }
+
         const sessionId = selectedSpaceEl.getAttribute('data-sessionId');
         const windowId = selectedSpaceEl.getAttribute('data-windowId');
-        const newSessionName = nodes.moveInput.value;
-        const params = {};
 
-        if (sessionId && sessionId !== 'false') {
-            params.sessionId = sessionId;
-
-            if (globalTabId) {
-                params.action = 'moveTabToSession';
-                params.tabId = globalTabId;
-            } else if (globalUrl) {
-                params.action = 'addLinkToSession';
-                params.url = globalUrl;
+        if (globalTabId) {
+            if (sessionId) {
+                chrome.runtime.sendMessage({
+                    action: 'moveTabToSession',
+                    tabId: globalTabId,
+                    sessionId: sessionId,
+                });
+            } else if (windowId) {
+                chrome.runtime.sendMessage({
+                    action: 'moveTabToWindow',
+                    tabId: globalTabId,
+                    windowId: windowId,
+                });
             }
-        } else if (windowId && windowId !== 'false') {
-            params.windowId = windowId;
-
-            if (globalTabId) {
-                params.action = 'moveTabToWindow';
-                params.tabId = globalTabId;
-            } else if (globalUrl) {
-                params.action = 'addLinkToWindow';
-                params.url = globalUrl;
-            }
-        } else {
-            params.sessionName = newSessionName;
-
-            if (globalTabId) {
-                params.action = 'moveTabToNewSession';
-                params.tabId = globalTabId;
-            } else if (globalUrl) {
-                params.action = 'addLinkToNewSession';
-                params.url = globalUrl;
+        } else if (globalUrl) {
+            if (sessionId) {
+                chrome.runtime.sendMessage({
+                    action: 'addLinkToSession',
+                    url: globalUrl,
+                    sessionId: sessionId,
+                });
+            } else if (windowId) {
+                chrome.runtime.sendMessage({
+                    action: 'addLinkToWindow',
+                    url: globalUrl,
+                    windowId: windowId,
+                });
             }
         }
 
-        chrome.runtime.sendMessage(params);
-        // this window will be closed by background script
+        window.close();
     }
+
     function handleEditSpace() {
         chrome.runtime.sendMessage({
             action: 'requestShowSpaces',
-            windowId: globalWindowId,
-            edit: 'true',
+            windowId: globalCurrentSpace.windowId,
+            edit: true,
         });
+        window.close();
     }
+
+    // TODO: Add proper error handling for message communication
+    // TODO: Consider implementing retry logic for failed message requests
+    // TODO: Add loading states for better user experience
 })();

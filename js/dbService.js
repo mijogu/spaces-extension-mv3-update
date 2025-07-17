@@ -1,6 +1,10 @@
 /* global db */
-// eslint-disable-next-line no-var
-var dbService = {
+
+// Import dependencies as ES modules for MV3
+import * as db from './db.js';
+
+// Convert to ES module for MV3
+export const dbService = {
     DB_SERVER: 'spaces',
     DB_VERSION: '1',
     DB_SESSIONS: 'ttSessions',
@@ -171,3 +175,7 @@ var dbService = {
             .then(_callback);
     },
 };
+
+// TODO: Add proper error handling for database operations
+// TODO: Consider adding database migration logic for version updates
+// TODO: Add database connection pooling for better performance
