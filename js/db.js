@@ -6,7 +6,7 @@
     'use strict';
 
     var indexedDB,
-        IDBKeyRange = window.IDBKeyRange || window.webkitIDBKeyRange,
+        IDBKeyRange = (typeof window !== 'undefined' ? window.IDBKeyRange : null) || (typeof self !== 'undefined' ? self.IDBKeyRange : null) || (typeof globalThis !== 'undefined' ? globalThis.IDBKeyRange : null),
         transactionModes = {
             readonly: 'readonly',
             readwrite: 'readwrite',
@@ -16,12 +16,19 @@
 
     var getIndexedDB = function() {
         if (!indexedDB) {
-            indexedDB =
-                window.indexedDB ||
-                window.webkitIndexedDB ||
-                window.mozIndexedDB ||
-                window.oIndexedDB ||
-                window.msIndexedDB;
+            // Try different global objects for service worker compatibility
+            const globalObj = typeof window !== 'undefined' ? window : 
+                             typeof self !== 'undefined' ? self : 
+                             typeof globalThis !== 'undefined' ? globalThis : null;
+            
+            if (globalObj) {
+                indexedDB =
+                    globalObj.indexedDB ||
+                    globalObj.webkitIndexedDB ||
+                    globalObj.mozIndexedDB ||
+                    globalObj.oIndexedDB ||
+                    globalObj.msIndexedDB;
+            }
 
             if (!indexedDB) {
                 throw 'IndexedDB required';
@@ -439,8 +446,14 @@
     // Export for ES modules in MV3
     if (typeof window !== 'undefined') {
         window.db = db;
+    } else if (typeof self !== 'undefined') {
+        self.db = db;
+    } else if (typeof globalThis !== 'undefined') {
+        globalThis.db = db;
     }
-})(typeof window !== 'undefined' ? window : this);
+})(typeof window !== 'undefined' ? window : 
+   typeof self !== 'undefined' ? self : 
+   typeof globalThis !== 'undefined' ? globalThis : this);
 
 // TODO: Add proper error handling for IndexedDB operations
 // TODO: Consider adding database connection pooling for better performance

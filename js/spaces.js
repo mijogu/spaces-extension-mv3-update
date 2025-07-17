@@ -155,7 +155,9 @@
         if (tab.favIconUrl && tab.favIconUrl.indexOf('chrome://theme') < 0) {
             faviconSrc = tab.favIconUrl;
         } else {
-            faviconSrc = `chrome://favicon/${tab.url}`;
+            // In MV3, we can't use chrome://favicon/ URLs directly
+            // Use a default favicon or the tab's favIconUrl if available
+            faviconSrc = tab.favIconUrl || 'img/icon16.png';
         }
         faviconEl.setAttribute('src', faviconSrc);
 
