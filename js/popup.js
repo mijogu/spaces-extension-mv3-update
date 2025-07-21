@@ -21,6 +21,28 @@ import { utils } from './utils.js';
     document.addEventListener('DOMContentLoaded', async () => {
         // BREAKING_CHANGE: chrome.extension.getBackgroundPage() is not supported in MV3
         // Using chrome.runtime.sendMessage instead to communicate with service worker
+        
+        // Add service worker connection check
+        try {
+            // Test service worker connection
+            await new Promise((resolve, reject) => {
+                chrome.runtime.sendMessage({ action: 'ping' }, response => {
+                    if (chrome.runtime.lastError) {
+                        reject(new Error(chrome.runtime.lastError.message));
+                    } else {
+                        resolve(response);
+                    }
+                });
+            });
+        } catch (error) {
+            console.error('Service worker not ready:', error);
+            // Show error message to user
+            const errorDiv = document.createElement('div');
+            errorDiv.textContent = 'Extension is initializing, please try again in a moment.';
+            errorDiv.style.cssText = 'color: red; padding: 10px; text-align: center;';
+            document.body.insertBefore(errorDiv, document.body.firstChild);
+            return;
+        }
         const url = utils.getHashVariable('url', window.location.href);
         globalUrl = url !== '' ? decodeURIComponent(url) : false;
         const windowId = utils.getHashVariable(
@@ -43,12 +65,26 @@ import { utils } from './utils.js';
                   chrome.runtime.sendMessage({
                       action: 'requestSpaceDetail',
                       windowId: parseInt(globalWindowId, 10)
-                  }, resolve);
+                  }, response => {
+                      if (chrome.runtime.lastError) {
+                          console.log('Service worker connection error:', chrome.runtime.lastError.message);
+                          resolve(null);
+                      } else {
+                          resolve(response);
+                      }
+                  });
               })
             : new Promise(resolve => {
                   chrome.runtime.sendMessage({
                       action: 'requestSpaceDetail'
-                  }, resolve);
+                  }, response => {
+                      if (chrome.runtime.lastError) {
+                          console.log('Service worker connection error:', chrome.runtime.lastError.message);
+                          resolve(null);
+                      } else {
+                          resolve(response);
+                      }
+                  });
               });
 
         requestSpacePromise.then(space => {
@@ -124,14 +160,24 @@ import { utils } from './utils.js';
      */
 
     function renderMainCard() {
+        console.log('renderMainCard called');
+        
         // Request hotkeys from service worker
         chrome.runtime.sendMessage({ action: 'requestHotkeys' }, hotkeys => {
-            document.querySelector(
-                '#switcherLink .hotkey'
-            ).innerHTML = hotkeys.switchCode ? hotkeys.switchCode : NO_HOTKEY;
-            document.querySelector(
-                '#moverLink .hotkey'
-            ).innerHTML = hotkeys.moveCode ? hotkeys.moveCode : NO_HOTKEY;
+            if (chrome.runtime.lastError) {
+                console.log('Hotkeys request error:', chrome.runtime.lastError.message);
+                return;
+            }
+            console.log('Hotkeys received:', hotkeys);
+            const switcherHotkey = document.querySelector('#switcherLink .hotkey');
+            const moverHotkey = document.querySelector('#moverLink .hotkey');
+            
+            if (switcherHotkey) {
+                switcherHotkey.innerHTML = hotkeys.switchCode ? hotkeys.switchCode : NO_HOTKEY;
+            }
+            if (moverHotkey) {
+                moverHotkey.innerHTML = hotkeys.moveCode ? hotkeys.moveCode : NO_HOTKEY;
+            }
         });
 
         const hotkeyEls = document.querySelectorAll('.hotkey');
@@ -144,40 +190,63 @@ import { utils } from './utils.js';
             });
         }
 
-        document
-            .querySelector('#allSpacesLink .optionText')
-            .addEventListener('click', () => {
+        const allSpacesLink = document.querySelector('#allSpacesLink .optionText');
+        console.log('allSpacesLink element:', allSpacesLink);
+        if (allSpacesLink) {
+            allSpacesLink.addEventListener('click', () => {
+                console.log('allSpacesLink clicked');
                 chrome.runtime.sendMessage({
                     action: 'requestShowSpaces',
+                }, response => {
+                    if (chrome.runtime.lastError) {
+                        console.log('requestShowSpaces error:', chrome.runtime.lastError.message);
+                    }
                 });
                 window.close();
             });
-        document
-            .querySelector('#switcherLink .optionText')
-            .addEventListener('click', () => {
+        }
+        const switcherLink = document.querySelector('#switcherLink .optionText');
+        console.log('switcherLink element:', switcherLink);
+        if (switcherLink) {
+            switcherLink.addEventListener('click', () => {
+                console.log('switcherLink clicked');
                 // Request popup params from service worker
                 chrome.runtime.sendMessage({
                     action: 'generatePopupParams',
                     actionType: 'switch'
                 }, params => {
+                    if (chrome.runtime.lastError) {
+                        console.log('generatePopupParams error:', chrome.runtime.lastError.message);
+                        return;
+                    }
+                    console.log('generatePopupParams response:', params);
                     if (!params) return;
                     window.location.hash = params;
                     window.location.reload();
                 });
             });
-        document
-            .querySelector('#moverLink .optionText')
-            .addEventListener('click', () => {
+        }
+        const moverLink = document.querySelector('#moverLink .optionText');
+        console.log('moverLink element:', moverLink);
+        if (moverLink) {
+            moverLink.addEventListener('click', () => {
+                console.log('moverLink clicked');
                 // Request popup params from service worker
                 chrome.runtime.sendMessage({
                     action: 'generatePopupParams',
                     actionType: 'move'
                 }, params => {
+                    if (chrome.runtime.lastError) {
+                        console.log('generatePopupParams error:', chrome.runtime.lastError.message);
+                        return;
+                    }
+                    console.log('generatePopupParams response:', params);
                     if (!params) return;
                     window.location.hash = params;
                     window.location.reload();
                 });
             });
+        }
     }
 
     function handleNameEdit() {

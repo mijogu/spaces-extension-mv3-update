@@ -21,9 +21,9 @@ const spacesService = {
     noop: () => {},
 
     // initialise spaces - combine open windows with saved sessions
-    initialiseSpaces: () => {
-        // update version numbers
-        spacesService.lastVersion = spacesService.fetchLastVersion();
+    initialiseSpaces: async () => {
+        // update version numbers - handle Promise for MV3 compatibility
+        spacesService.lastVersion = await spacesService.fetchLastVersion();
         spacesService.setLastVersion(chrome.runtime.getManifest().version);
 
         dbService.fetchAllSessions(sessions => {
@@ -227,18 +227,22 @@ const spacesService = {
         });
     },
 
-    // local storage getters/setters
+    // local storage getters/setters - Updated for MV3 service worker compatibility
     fetchLastVersion: () => {
-        let version = localStorage.getItem('spacesVersion');
-        if (version !== null) {
-            version = JSON.parse(version);
-            return version;
-        }
-        return 0;
+        return new Promise((resolve) => {
+            chrome.storage.local.get(['spacesVersion'], (result) => {
+                const version = result.spacesVersion;
+                if (version !== undefined) {
+                    resolve(version);
+                } else {
+                    resolve(0);
+                }
+            });
+        });
     },
 
     setLastVersion: newVersion => {
-        localStorage.setItem('spacesVersion', JSON.stringify(newVersion));
+        chrome.storage.local.set({ spacesVersion: newVersion });
     },
 
     // event listener functions for window and tab events

@@ -108,6 +108,13 @@ export const spaces = (() => {
     // add listeners for message requests from other extension pages (spaces.html & tab.html)
 
     chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+        // Add error handling for service worker lifecycle issues
+        if (!request || !request.action) {
+            console.error('Invalid message received:', request);
+            sendResponse({ error: 'Invalid message format' });
+            return false;
+        }
+
         if (debug) {
             // eslint-disable-next-line no-console
             console.log(`listener fired: ${JSON.stringify(request)}`);
@@ -117,8 +124,13 @@ export const spaces = (() => {
         let windowId;
         let tabId;
 
-        // endpoints called by spaces.js
-        switch (request.action) {
+        try {
+            // endpoints called by spaces.js
+            switch (request.action) {
+                case 'ping':
+                    // Simple ping to check if service worker is ready
+                    sendResponse({ status: 'ready' });
+                    return false;
             case 'loadSession':
                 sessionId = _cleanParameter(request.sessionId);
                 if (sessionId) {
@@ -383,6 +395,11 @@ export const spaces = (() => {
             default:
                 return false;
         }
+        } catch (error) {
+            console.error('Error in message handler:', error);
+            sendResponse({ error: 'Internal service worker error' });
+            return false;
+        }
     });
 
     // add listeners for keyboard shortcuts
@@ -399,17 +416,31 @@ export const spaces = (() => {
     });
 
     // add context menu entry
-
-    chrome.contextMenus.create({
-        id: 'spaces-add-link',
-        title: 'Add link to space...',
-        contexts: ['link'],
+    // Handle context menu creation with error handling for MV3 service worker lifecycle
+    chrome.contextMenus.removeAll(() => {
+        chrome.contextMenus.create({
+            id: 'spaces-add-link',
+            title: 'Add link to space...',
+            contexts: ['link'],
+        }, () => {
+            if (chrome.runtime.lastError) {
+                console.log('Context menu creation error:', chrome.runtime.lastError.message);
+            }
+        });
     });
+    
     chrome.contextMenus.onClicked.addListener(info => {
         // handle showing the move tab popup (tab.html)
         if (info.menuItemId === 'spaces-add-link') {
             showSpacesMoveWindow(info.linkUrl);
         }
+    });
+
+    // Initialize spaces service
+    spacesService.initialiseSpaces().then(() => {
+        spacesService.initialiseTabHistory();
+    }).catch(error => {
+        console.log('Error initializing spaces service:', error);
     });
 
     // runtime extension install listener
