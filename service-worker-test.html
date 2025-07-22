@@ -133,6 +133,19 @@
     </div>
     
     <div class="test-section">
+        <h2>Integration Tests (Critical Functionality)</h2>
+        <p>Comprehensive tests for session management, database operations, tab management, and service worker lifecycle.</p>
+        <div class="button-group">
+            <button id="integration-tests-btn">Run Integration Tests</button>
+            <button id="session-tests-btn">Session Management Tests</button>
+            <button id="database-tests-btn">Database Tests</button>
+            <button id="tab-tests-btn">Tab Management Tests</button>
+            <button id="lifecycle-tests-btn">Service Worker Lifecycle Tests</button>
+        </div>
+        <div id="integration-results"></div>
+    </div>
+    
+    <div class="test-section">
         <h2>Storage Tests</h2>
         <div class="button-group">
             <button id="storage-btn">Test Storage</button>
@@ -147,6 +160,7 @@
     
     <!-- Import test scripts -->
     <script type="module" src="js/tests/popup-test-new-sw.js"></script>
+    <script type="module" src="js/tests/service-worker-integration.test.js"></script>
     <script src="js/tests/popup-test-comparison.js"></script>
 </body>
 </html> 

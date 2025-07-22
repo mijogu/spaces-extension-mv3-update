@@ -36,6 +36,52 @@ function setupEventListeners() {
         if (window.runNewServiceWorkerTests) window.runNewServiceWorkerTests();
     });
     
+    // Integration test buttons
+    document.getElementById('integration-tests-btn')?.addEventListener('click', async () => {
+        if (window.IntegrationTestRunner) {
+            const runner = new window.IntegrationTestRunner();
+            await runner.runAllTests();
+        }
+    });
+    
+    document.getElementById('session-tests-btn')?.addEventListener('click', async () => {
+        if (window.IntegrationTestRunner) {
+            const runner = new window.IntegrationTestRunner();
+            await runner.sessionTests.testSessionCreation();
+            await runner.sessionTests.testSessionMatching();
+            await runner.sessionTests.testSessionPersistence();
+            runner.printResults();
+        }
+    });
+    
+    document.getElementById('database-tests-btn')?.addEventListener('click', async () => {
+        if (window.IntegrationTestRunner) {
+            const runner = new window.IntegrationTestRunner();
+            await runner.databaseTests.testDatabaseConnection();
+            await runner.databaseTests.testDatabaseErrorHandling();
+            runner.printResults();
+        }
+    });
+    
+    document.getElementById('tab-tests-btn')?.addEventListener('click', async () => {
+        if (window.IntegrationTestRunner) {
+            const runner = new window.IntegrationTestRunner();
+            await runner.tabTests.testTabEventHandling();
+            await runner.tabTests.testTabHistoryTracking();
+            runner.printResults();
+        }
+    });
+    
+    document.getElementById('lifecycle-tests-btn')?.addEventListener('click', async () => {
+        if (window.IntegrationTestRunner) {
+            const runner = new window.IntegrationTestRunner();
+            await runner.lifecycleTests.testLazyInitialization();
+            await runner.lifecycleTests.testMessageHandling();
+            await runner.lifecycleTests.testErrorRecovery();
+            runner.printResults();
+        }
+    });
+    
     // Storage button
     document.getElementById('storage-btn')?.addEventListener('click', () => {
         if (window.testStorage) window.testStorage();
