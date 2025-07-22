@@ -86,6 +86,42 @@ function setupEventListeners() {
     document.getElementById('storage-btn')?.addEventListener('click', () => {
         if (window.testStorage) window.testStorage();
     });
+
+    // Import test buttons
+    document.getElementById('test-basic-import')?.addEventListener('click', async () => {
+        if (window.importTests) {
+            const result = await window.importTests.testBasicImport();
+            console.log('Restore import test result:', result);
+        }
+    });
+
+    document.getElementById('test-additive-import')?.addEventListener('click', async () => {
+        if (window.importTests) {
+            const result = await window.importTests.testAdditiveImport();
+            console.log('Additive import test result:', result);
+        }
+    });
+
+    document.getElementById('test-session-detail')?.addEventListener('click', async () => {
+        if (window.importTests) {
+            const result = await window.importTests.testSessionDetail();
+            console.log('Session detail test result:', result);
+        }
+    });
+
+    document.getElementById('test-manage-spaces-refresh')?.addEventListener('click', async () => {
+        if (window.importTests) {
+            const result = await window.importTests.testManageSpacesRefresh();
+            console.log('Manage Spaces refresh test result:', result);
+        }
+    });
+
+    document.getElementById('test-import-types')?.addEventListener('click', async () => {
+        if (window.importTests) {
+            const result = await window.importTests.testImportTypes();
+            console.log('Import types test result:', result);
+        }
+    });
 }
 
 // Setup event listeners on page load

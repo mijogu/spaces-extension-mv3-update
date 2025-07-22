@@ -2,6 +2,7 @@
 <html>
 
 <head>
+    <meta charset="UTF-8">
     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css">
     <link href='https://fonts.googleapis.com/css?family=Open+Sans:700,300,600,400' rel='stylesheet' type='text/css'>
     <title id='gsTitle'>Spaces</title>
@@ -31,8 +32,9 @@
                 <ul id="closedSpaces"></ul>
                 <h2>Import / Export:</h2>
                 <ul>
-                    <li><a id="actionImport" href="#">Import spaces or urls...</a></li>
-                    <li><a id="actionBackup" href="#">Backup all spaces...</a></li>
+                    <li><a id="actionImportAdd" href="#">[+] Add spaces from backup...</a></li>
+                    <li><a id="actionImportReplace" href="#">[R] Restore from backup (replaces all)...</a></li>
+                    <li><a id="actionBackup" href="#">[B] Backup all spaces...</a></li>
                 </ul>
             </div>
         </div>
@@ -76,11 +78,17 @@
 
         <div class="blocker"></div>
         <div class="modal">
-            <h2>Import a new space</h2>
+            <h2 id="modalTitle">Import spaces</h2>
+            <div id="importTypeInfo" class="import-info">
+                <p id="importTypeDescription">Choose an import type above.</p>
+            </div>
             <textarea id="importTextArea" spellcheck="false"
                 placeholder="Paste a list of line-separated urls or the contents of a spaces backup file" wrap="off"
                 rows="10"></textarea>
-            <a id="importBtn" class="button" href="#">Import</a>
+            <div class="modal-buttons">
+                <a id="importBtn" class="button" href="#">Import</a>
+                <a id="cancelBtn" class="button secondary" href="#">Cancel</a>
+            </div>
         </div>
 
     </div>

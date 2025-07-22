@@ -152,6 +152,19 @@
         </div>
         <div id="storage-results"></div>
     </div>
+
+    <div class="test-section">
+        <h2>Import Functionality Tests</h2>
+        <p>Tests the backup import functionality with proper session formatting.</p>
+        <div class="button-group">
+            <button id="test-basic-import">Test Restore Import</button>
+            <button id="test-additive-import">Test Additive Import</button>
+            <button id="test-session-detail">Test Session Detail</button>
+            <button id="test-manage-spaces-refresh">Test Manage Spaces Refresh</button>
+            <button id="test-import-types">Test Import Types</button>
+        </div>
+        <div id="import-results"></div>
+    </div>
     
     <div class="test-section">
         <h2>Test Results Summary</h2>
@@ -161,6 +174,7 @@
     <!-- Import test scripts -->
     <script type="module" src="js/tests/popup-test-new-sw.js"></script>
     <script type="module" src="js/tests/service-worker-integration.test.js"></script>
+    <script type="module" src="js/tests/import-test.js"></script>
     <script src="js/tests/popup-test-comparison.js"></script>
 </body>
 </html> 

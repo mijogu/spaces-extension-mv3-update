@@ -360,6 +360,12 @@ async function handleMessage(request, sender, sendResponse) {
             }
             break;
             
+        case 'importSessions':
+            if (request.spaces) {
+                handleImportSessions(request.spaces, sendResponse);
+            }
+            break;
+            
         case 'deleteSession':
             const deleteSessionId = _cleanParameter(request.sessionId);
             if (deleteSessionId) {
@@ -406,8 +412,23 @@ function checkInternalSpacesWindows(windowId, windowClosed) {
 }
 
 function updateSpacesWindow(source) {
-    // Implementation would go here
-    console.log('Updating spaces window:', source);
+    console.log('🔄 Updating spaces window from source:', source);
+    
+    // Send a message to the Manage Spaces window to refresh its data
+    if (spacesOpenWindowId) {
+        chrome.tabs.query({ windowId: spacesOpenWindowId }, tabs => {
+            if (tabs.length > 0) {
+                // Send refresh message to the Manage Spaces window
+                chrome.tabs.sendMessage(tabs[0].id, { action: 'refreshSpacesData' }, response => {
+                    if (chrome.runtime.lastError) {
+                        console.log('Manage Spaces window not ready for refresh:', chrome.runtime.lastError.message);
+                    } else {
+                        console.log('✅ Manage Spaces window refreshed successfully');
+                    }
+                });
+            }
+        });
+    }
 }
 
 function requestHotkeys(callback) {
@@ -708,6 +729,10 @@ function handleSaveNewSession(windowId, sessionName, callback) {
                 dbService.fetchAllSessions(sessions => {
                     spacesService.sessions = sessions;
                     console.log('Refreshed spacesService sessions:', sessions);
+                    
+                    // Update the Manage Spaces window if it's open
+                    updateSpacesWindow('saveNewSession');
+                    
                     callback(result);
                 });
             } else {
@@ -1002,18 +1027,103 @@ function handleImportNewSession(urlList, callback) {
 }
 
 function handleRestoreFromBackup(spaces, callback) {
+    console.log('🔄 Starting backup restore with', spaces.length, 'spaces');
+    
     // Clear existing sessions and restore from backup
     dbService.fetchAllSessions(sessions => {
+        console.log('🗑️ Clearing', sessions.length, 'existing sessions');
         sessions.forEach(session => {
             dbService.removeSession(session.id);
         });
         
-        // Add restored sessions
-        spaces.forEach(space => {
-            dbService.createSession(space);
+        // Add restored sessions with proper formatting
+        let restoredCount = 0;
+        spaces.forEach((space, index) => {
+            // Ensure imported space has all required fields
+            const formattedSpace = {
+                name: space.name || `Imported Session ${index + 1}`,
+                tabs: space.tabs || [],
+                sessionHash: space.sessionHash || spacesService.generateSessionHash(space.tabs || []),
+                lastAccess: space.lastAccess || Date.now(),
+                windowId: false, // Imported sessions should not be associated with any window
+                history: space.history || [] // Optional history field
+            };
+            
+            console.log('📦 Creating imported session:', formattedSpace.name, 'with', formattedSpace.tabs.length, 'tabs');
+            
+            dbService.createSession(formattedSpace, (result) => {
+                restoredCount++;
+                console.log('✅ Restored session', restoredCount, 'of', spaces.length, ':', result ? 'success' : 'failed');
+                
+                // When all sessions are processed, refresh spacesService and callback
+                if (restoredCount === spaces.length) {
+                    console.log('🔄 Refreshing spacesService after restore...');
+                    dbService.fetchAllSessions(sessions => {
+                        spacesService.sessions = sessions;
+                        console.log('✅ Backup restore complete. Total sessions:', sessions.length);
+                        
+                        // Update the Manage Spaces window if it's open
+                        updateSpacesWindow('restoreFromBackup');
+                        
+                        callback(true);
+                    });
+                }
+            });
         });
+    });
+}
+
+function handleImportSessions(spaces, callback) {
+    console.log('📥 Starting session import with', spaces.length, 'spaces');
+    
+    // Get current sessions to check for duplicates
+    dbService.fetchAllSessions(existingSessions => {
+        console.log('📊 Found', existingSessions.length, 'existing sessions');
         
-        callback(true);
+        // Add new sessions without deleting existing ones
+        let importedCount = 0;
+        let skippedCount = 0;
+        
+        spaces.forEach((space, index) => {
+            // Check if session with same name already exists
+            const existingSession = existingSessions.find(s => s.name === space.name);
+            if (existingSession) {
+                console.log('⚠️ Skipping duplicate session:', space.name);
+                skippedCount++;
+                return;
+            }
+            
+            // Ensure imported space has all required fields
+            const formattedSpace = {
+                name: space.name || `Imported Session ${index + 1}`,
+                tabs: space.tabs || [],
+                sessionHash: space.sessionHash || spacesService.generateSessionHash(space.tabs || []),
+                lastAccess: space.lastAccess || Date.now(),
+                windowId: false, // Imported sessions should not be associated with any window
+                history: space.history || [] // Optional history field
+            };
+            
+            console.log('📦 Creating imported session:', formattedSpace.name, 'with', formattedSpace.tabs.length, 'tabs');
+            
+            dbService.createSession(formattedSpace, (result) => {
+                importedCount++;
+                console.log('✅ Imported session', importedCount, 'of', spaces.length, ':', result ? 'success' : 'failed');
+                
+                // When all sessions are processed, refresh spacesService and callback
+                if (importedCount + skippedCount === spaces.length) {
+                    console.log('🔄 Refreshing spacesService after import...');
+                    dbService.fetchAllSessions(sessions => {
+                        spacesService.sessions = sessions;
+                        console.log('✅ Session import complete. Total sessions:', sessions.length, 'Imported:', importedCount, 'Skipped:', skippedCount);
+                        
+                        // Update the Manage Spaces window if it's open
+                        updateSpacesWindow('importSessions');
+                        
+                        callback({ success: true, imported: importedCount, skipped: skippedCount, total: sessions.length });
+                    });
+                }
+            });
+        });
     });
 }
 
@@ -1042,6 +1152,10 @@ function handleDeleteSession(sessionId, force, callback) {
                         });
                         
                         console.log('Refreshed and re-evaluated spacesService sessions after delete:', spacesService.sessions);
+                        
+                        // Update the Manage Spaces window if it's open
+                        updateSpacesWindow('deleteSession');
+                        
                         callback(result);
                     });
                 });
@@ -1063,7 +1177,13 @@ function handleAddLinkToNewSession(url, sessionName, callback) {
         windowId: false
     };
     
-    dbService.createSession(session, callback);
+    dbService.createSession(session, (result) => {
+        if (result) {
+            // Update the Manage Spaces window if it's open
+            updateSpacesWindow('addLinkToNewSession');
+        }
+        callback(result);
+    });
 }
 
 function handleMoveTabToNewSession(tabId, sessionName, callback) {
@@ -1086,6 +1206,8 @@ function handleMoveTabToNewSession(tabId, sessionName, callback) {
         dbService.createSession(session, result => {
             if (result) {
                 chrome.tabs.remove(numericTabId);
+                // Update the Manage Spaces window if it's open
+                updateSpacesWindow('moveTabToNewSession');
             }
             callback(result);
         });

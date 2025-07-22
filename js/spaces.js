@@ -5,6 +5,7 @@
     const nodes = {};
     let globalSelectedSpace;
     let bannerState;
+    let currentImportType = null; // 'add' or 'replace'
 
     // METHODS FOR RENDERING SIDENAV (spaces list)
 
@@ -227,6 +228,12 @@
         }, 100);
     }
 
+    function showImportModal(title, description) {
+        nodes.modalTitle.textContent = title;
+        nodes.importTypeDescription.textContent = description;
+        toggleModal(true);
+    }
+
     function toggleModal(visible) {
         nodes.modalBlocker.style.display = visible ? 'block' : 'none';
         nodes.modalContainer.style.display = visible ? 'block' : 'none';
@@ -234,6 +241,8 @@
         if (visible) {
             nodes.modalInput.value = '';
             nodes.modalInput.focus();
+        } else {
+            currentImportType = null;
         }
     }
 
@@ -371,9 +380,24 @@
         // check for json object
         try {
             spacesObject = JSON.parse(rawInput);
-            performRestoreFromBackup(spacesObject, () => {
-                updateSpacesList();
-            });
+            
+            if (currentImportType === 'add') {
+                // Use the new additive import function
+                performImportSessions(spacesObject, (result) => {
+                    console.log('Additive import result:', result);
+                    updateSpacesList();
+                });
+            } else if (currentImportType === 'replace') {
+                // Use the existing restore function (replaces all)
+                performRestoreFromBackup(spacesObject, () => {
+                    updateSpacesList();
+                });
+            } else {
+                // Fallback to replace behavior for backward compatibility
+                performRestoreFromBackup(spacesObject, () => {
+                    updateSpacesList();
+                });
+            }
         } catch (e) {
             // otherwise treat as a list of newline separated urls
             if (rawInput.trim().length > 0) {
@@ -565,6 +589,16 @@
         );
     }
 
+    function performImportSessions(spacesObject, callback) {
+        chrome.runtime.sendMessage(
+            {
+                action: 'importSessions',
+                spaces: spacesObject,
+            },
+            callback
+        );
+    }
+
     function performRestoreFromBackup(spacesObject, callback) {
         chrome.runtime.sendMessage(
             {
@@ -585,9 +619,18 @@
         };
 
         // register incoming events listener
-        chrome.runtime.onMessage.addListener(request => {
+        chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             if (request.action === 'updateSpaces' && request.spaces) {
                 handleAutoUpdateRequest(request.spaces);
+            } else if (request.action === 'refreshSpacesData') {
+                console.log('🔄 Refresh request received from service worker');
+                // Refresh the spaces list from the service worker
+                fetchAllSpaces(spaces => {
+                    updateSpacesList(spaces);
+                    console.log('✅ Spaces list refreshed successfully');
+                    sendResponse({ success: true });
+                });
+                return true; // Keep message channel open for async response
             }
         });
 
@@ -623,15 +666,28 @@
         nodes.actionDelete.addEventListener('click', () => {
             handleDelete();
         });
-        nodes.actionImport.addEventListener('click', e => {
+        nodes.actionImportAdd.addEventListener('click', e => {
             e.preventDefault();
-            toggleModal(true);
+            currentImportType = 'add';
+            showImportModal('Add Spaces from Backup', 
+                'This will add the imported spaces to your existing collection. Duplicate names will be skipped.');
+        });
+        
+        nodes.actionImportReplace.addEventListener('click', e => {
+            e.preventDefault();
+            currentImportType = 'replace';
+            showImportModal('Restore from Backup', 
+                '⚠️ WARNING: This will replace ALL your existing spaces with the imported backup. This action cannot be undone.');
         });
         nodes.modalBlocker.addEventListener('click', () => {
             toggleModal(false);
         });
         nodes.modalButton.addEventListener('click', () => {
             handleImport();
+            toggleModal(false);
+        });
+        
+        nodes.cancelBtn.addEventListener('click', () => {
             toggleModal(false);
         });
     }
@@ -778,12 +834,16 @@
         nodes.actionExport = document.getElementById('actionExport');
         nodes.actionBackup = document.getElementById('actionBackup');
         nodes.actionDelete = document.getElementById('actionDelete');
-        nodes.actionImport = document.getElementById('actionImport');
+        nodes.actionImportAdd = document.getElementById('actionImportAdd');
+        nodes.actionImportReplace = document.getElementById('actionImportReplace');
         nodes.banner = document.getElementById('banner');
         nodes.modalBlocker = document.querySelector('.blocker');
         nodes.modalContainer = document.querySelector('.modal');
         nodes.modalInput = document.getElementById('importTextArea');
         nodes.modalButton = document.getElementById('importBtn');
+        nodes.modalTitle = document.getElementById('modalTitle');
+        nodes.importTypeDescription = document.getElementById('importTypeDescription');
+        nodes.cancelBtn = document.getElementById('cancelBtn');
 
         nodes.home.setAttribute('href', chrome.runtime.getURL('spaces.html'));
 
