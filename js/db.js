@@ -458,3 +458,6 @@
 // TODO: Add proper error handling for IndexedDB operations
 // TODO: Consider adding database connection pooling for better performance
 // TODO: Add database migration support for version updates
+
+// Export for ES modules
+export default db;

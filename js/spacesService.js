@@ -1,7 +1,7 @@
 /* global chrome */
 
 // Import dependencies as ES modules for MV3
-import * as dbService from './dbService.js';
+import { dbService } from './dbService.js';
 
 /* spaces
  * Copyright (C) 2015 Dean Oemcke

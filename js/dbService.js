@@ -1,7 +1,7 @@
 /* global db */
 
 // Import dependencies as ES modules for MV3
-import * as db from './db.js';
+import db from './db.js';
 
 // Convert to ES module for MV3
 export const dbService = {
