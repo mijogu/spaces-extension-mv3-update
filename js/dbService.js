@@ -50,7 +50,11 @@ export const dbService = {
             return s
                 .query(dbService.DB_SESSIONS)
                 .all()
-                .execute();
+                .execute()
+                .then(sessions => {
+                    console.log('_fetchAllSessions - raw database result:', sessions);
+                    return sessions;
+                });
         });
     },
 
@@ -73,6 +77,7 @@ export const dbService = {
         const _callback =
             typeof callback !== 'function' ? dbService.noop : callback;
         dbService._fetchAllSessions().then(sessions => {
+            console.log('dbService.fetchAllSessions - returned sessions:', sessions);
             _callback(sessions);
         });
     },
@@ -128,15 +133,27 @@ export const dbService = {
         // delete session id in case it already exists
         const { id, ..._session } = session;
 
+        console.log('dbService.createSession - input session:', session);
+        console.log('dbService.createSession - session without id:', _session);
+
         dbService
             .getDb()
             .then(s => {
                 return s.add(dbService.DB_SESSIONS, _session);
             })
             .then(result => {
+                console.log('dbService.createSession - database result:', result);
                 if (result.length > 0) {
+                    console.log('dbService.createSession - returning result[0]:', result[0]);
                     _callback(result[0]);
+                } else {
+                    console.error('dbService.createSession - no result returned');
+                    _callback(false);
                 }
+            })
+            .catch(error => {
+                console.error('dbService.createSession - error:', error);
+                _callback(false);
             });
     },
 

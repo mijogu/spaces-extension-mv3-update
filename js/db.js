@@ -386,25 +386,6 @@
                 request.onsuccess = function(e) {
                     var database = e.target.result;
                     var server = new Server(database, options.server);
-
-                    if (options.schema) {
-                        var schema = options.schema();
-                        for (var table in schema) {
-                            if (hasOwn.call(schema, table)) {
-                                var tableSchema = schema[table];
-                                var store = database.createObjectStore(table, tableSchema.key);
-                                var indexes = tableSchema.indexes || {};
-
-                                for (var index in indexes) {
-                                    if (hasOwn.call(indexes, index)) {
-                                        var indexSchema = indexes[index];
-                                        store.createIndex(index, index, indexSchema);
-                                    }
-                                }
-                            }
-                        }
-                    }
-
                     resolve(server);
                 };
 

@@ -243,10 +243,14 @@
         if (sessionId) {
             performLoadSession(sessionId, () => {
                 reroute(sessionId, false, false);
+                // Close the Manage Spaces window after successful action
+                window.close();
             });
         } else if (windowId) {
             performLoadWindow(windowId, () => {
                 reroute(false, windowId, false);
+                // Close the Manage Spaces window after successful action
+                window.close();
             });
         }
     }
@@ -301,8 +305,15 @@
     }
 
     function handleNameSave() {
+        // Safety check for globalSelectedSpace
+        if (!globalSelectedSpace) {
+            console.error('No space selected for renaming');
+            toggleNameEditMode(false);
+            return;
+        }
+        
         const newName = nodes.nameFormInput.value;
-        const oldName = globalSelectedSpace.name;
+        const oldName = globalSelectedSpace.name || '';
         const { sessionId } = globalSelectedSpace;
         const { windowId } = globalSelectedSpace;
 
@@ -320,7 +331,16 @@
             });
         } else if (windowId) {
             performNewSessionSave(newName, windowId, session => {
-                if (session) reroute(session.id, false, true);
+                console.log('New session saved:', session);
+                console.log('Session ID type:', typeof session.id, 'Value:', session.id);
+                if (session) {
+                    // Update the global selected space before rerouting
+                    globalSelectedSpace = session;
+                    reroute(session.id, false, true);
+                } else {
+                    console.error('Failed to save new session');
+                    toggleNameEditMode(false);
+                }
             });
         }
 
@@ -451,14 +471,14 @@
     }
 
     function fetchSpaceDetail(sessionId, windowId, callback) {
-        chrome.runtime.sendMessage(
-            {
-                action: 'requestSpaceDetail',
-                sessionId: sessionId || false,
-                windowId: windowId || false,
-            },
-            callback
-        );
+        const message = {
+            action: 'requestSpaceDetail',
+            sessionId: sessionId || false,
+            windowId: windowId || false,
+        };
+        console.log('Sending requestSpaceDetail message:', message);
+        
+        chrome.runtime.sendMessage(message, callback);
     }
 
     function performLoadSession(sessionId, callback) {
@@ -622,12 +642,16 @@
     function reroute(sessionId, windowId, forceRerender) {
         let hash;
 
+        console.log('Rerouting with:', { sessionId, windowId, forceRerender });
+        
         hash = '#';
         if (sessionId) {
             hash += `sessionId=${sessionId}`;
         } else if (windowId) {
-            hash += `windowId=${sessionId}`;
+            hash += `windowId=${windowId}`;
         }
+        
+        console.log('New hash will be:', hash);
 
         // if hash hasn't changed page will not trigger onhashchange event
         if (window.location.hash === hash) {
@@ -695,7 +719,9 @@
 
             // otherwise refetch space based on hashvars
         } else if (sessionId || windowId) {
+            console.log('Fetching space detail for:', { sessionId, windowId });
             fetchSpaceDetail(sessionId, windowId, space => {
+                console.log('Space detail received:', space);
                 addDuplicateMetadata(space);
 
                 // cache current selected space
@@ -712,6 +738,12 @@
     }
 
     function addDuplicateMetadata(space) {
+        // Safety check for undefined space or missing tabs
+        if (!space || !space.tabs || !Array.isArray(space.tabs)) {
+            console.warn('Invalid space object or missing tabs:', space);
+            return;
+        }
+        
         const dupeCounts = {};
 
         space.tabs.forEach(tab => {

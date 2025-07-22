@@ -520,8 +520,11 @@ const spacesService = {
     // PUBLIC FUNCTIONS
 
     getSessionBySessionId: sessionId => {
+        // Convert sessionId to number for comparison
+        const numericSessionId = typeof sessionId === 'string' ? parseInt(sessionId, 10) : sessionId;
+        
         const result = spacesService.sessions.filter(session => {
-            return session.id === sessionId;
+            return session.id === numericSessionId;
         });
         return result.length === 1 ? result[0] : false;
     },
@@ -608,6 +611,11 @@ const spacesService = {
         newUrl = spacesService._cleanUrl(newUrl);
 
         if (newUrl.length === 0) {
+            return;
+        }
+
+        // Safety check for session.history
+        if (!session.history || !Array.isArray(session.history)) {
             return;
         }
 
