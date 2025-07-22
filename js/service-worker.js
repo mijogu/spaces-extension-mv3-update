@@ -9,30 +9,60 @@ import { dbService } from './dbService.js';
 // State management - use chrome.storage for persistence
 let isInitialized = false;
 let initializationPromise = null;
+let lastActivityTime = Date.now();
 
 // Window tracking for internal spaces windows
 let spacesOpenWindowId = false;
 let spacesPopupWindowId = false;
 
+// Activity tracking to prevent service worker from becoming unresponsive
+function updateActivity() {
+    lastActivityTime = Date.now();
+}
+
+// Check if service worker has been inactive too long and needs reinitialization
+function checkInactivity() {
+    const now = Date.now();
+    const inactiveTime = now - lastActivityTime;
+    if (inactiveTime > 300000) { // 5 minutes
+        console.log('Service worker inactive for too long, reinitializing...');
+        isInitialized = false;
+        initializationPromise = null;
+    }
+}
+
 // Service worker lifecycle events
 chrome.runtime.onStartup.addListener(() => {
-    console.log('Service worker starting up...');
+    console.log('🔄 Service worker starting up...');
     // Initialize on startup to ensure service worker is ready
     initializeServiceWorker();
 });
 
 chrome.runtime.onInstalled.addListener((details) => {
-    console.log('Service worker installed...', details.reason);
+    console.log('📦 Service worker installed...', details.reason);
     // Initialize on both install and update to ensure service worker is ready
     initializeServiceWorker();
 });
 
 // Handle service worker activation
 self.addEventListener('activate', (event) => {
-    console.log('Service worker activated...');
+    console.log('⚡ Service worker activated...');
     // Don't block activation with heavy initialization
     event.waitUntil(Promise.resolve());
 });
+
+// Handle service worker termination
+self.addEventListener('beforeunload', (event) => {
+    console.log('💀 Service worker being terminated...');
+    // Save any critical state if needed
+});
+
+// Periodic activity check to keep service worker alive
+setInterval(() => {
+    updateActivity();
+    checkInactivity();
+    console.log('💓 Service worker heartbeat - last activity:', new Date(lastActivityTime).toISOString());
+}, 60000); // Check every minute
 
 // Lazy initialization - only initialize when first needed
 async function initializeServiceWorker() {
@@ -150,11 +180,15 @@ function setupEventListeners(spacesService, utils) {
 
 // Message handling with proper initialization
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    console.log('Message received:', request.action);
+    console.log('📨 Message received:', request.action, 'from:', sender.tab?.url || 'service worker');
+    
+    // Update activity on every message
+    updateActivity();
     
     // Handle simple messages that don't need initialization
     if (request.action === 'ping') {
-        sendResponse({ status: 'ready', initialized: isInitialized });
+        console.log('🏓 Ping received - service worker status:', { initialized: isInitialized, lastActivity: new Date(lastActivityTime).toISOString() });
+        sendResponse({ status: 'ready', initialized: isInitialized, lastActivity: lastActivityTime });
         return false;
     }
     
@@ -166,6 +200,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 // Handle messages with proper initialization
 async function handleMessageWithInitialization(request, sender, sendResponse) {
     try {
+        // Check for inactivity and reinitialize if needed
+        checkInactivity();
+        
         // Ensure service worker is initialized
         if (!isInitialized) {
             console.log('Service worker not initialized, initializing now...');
@@ -177,7 +214,23 @@ async function handleMessageWithInitialization(request, sender, sendResponse) {
         
     } catch (error) {
         console.error('Error handling message:', error);
-        sendResponse({ error: error.message });
+        
+        // If initialization failed, try to reset and reinitialize
+        if (!isInitialized) {
+            console.log('Attempting to recover from initialization failure...');
+            isInitialized = false;
+            initializationPromise = null;
+            
+            try {
+                await initializeServiceWorker();
+                await handleMessage(request, sender, sendResponse);
+            } catch (recoveryError) {
+                console.error('Recovery failed:', recoveryError);
+                sendResponse({ error: recoveryError.message });
+            }
+        } else {
+            sendResponse({ error: error.message });
+        }
     }
 }
 
@@ -358,7 +411,27 @@ function updateSpacesWindow(source) {
 }
 
 function requestHotkeys(callback) {
-    chrome.commands.getAll(callback);
+    chrome.commands.getAll(commands => {
+        let switchStr;
+        let moveStr;
+        let spacesStr;
+
+        commands.forEach(command => {
+            if (command.name === 'spaces-switch') {
+                switchStr = command.shortcut;
+            } else if (command.name === 'spaces-move') {
+                moveStr = command.shortcut;
+            } else if (command.name === 'spaces-open') {
+                spacesStr = command.shortcut;
+            }
+        });
+
+        callback({
+            switchCode: switchStr,
+            moveCode: moveStr,
+            spacesCode: spacesStr,
+        });
+    });
 }
 
 async function generatePopupParams(action, tabUrl) {
@@ -378,6 +451,11 @@ async function generatePopupParams(action, tabUrl) {
     const name = session ? session.name : '';
     
     let params = `action=${action}&windowId=${activeTab.windowId}&sessionName=${name}`;
+    
+    // For move action, include the tabId
+    if (action === 'move') {
+        params += `&tabId=${activeTab.id}`;
+    }
     
     if (tabUrl) {
         params += `&url=${encodeURIComponent(tabUrl)}`;
@@ -450,6 +528,27 @@ async function requestSpaceDetail(windowId, sessionId) {
 }
 
 function showSpacesOpenWindow(windowId, editMode) {
+    // Check if the Manage Spaces window is already open
+    if (spacesOpenWindowId) {
+        chrome.windows.get(spacesOpenWindowId, window => {
+            if (chrome.runtime.lastError) {
+                // Window doesn't exist anymore, clear the ID and create a new one
+                console.log('Manage Spaces window no longer exists, creating new one');
+                spacesOpenWindowId = null;
+                createSpacesWindow(windowId, editMode);
+            } else {
+                // Window exists, focus it
+                console.log('Focusing existing Manage Spaces window:', spacesOpenWindowId);
+                chrome.windows.update(spacesOpenWindowId, { focused: true });
+            }
+        });
+    } else {
+        // No window tracked, create a new one
+        createSpacesWindow(windowId, editMode);
+    }
+}
+
+function createSpacesWindow(windowId, editMode) {
     let url;
 
     if (editMode && windowId) {
@@ -532,18 +631,41 @@ function requestAllSpaces(callback) {
             return session && session.tabs && session.tabs.length > 0;
         });
     
-    // Sort results by last access
-    allSpaces.sort((a, b) => {
-        if (a.windowId && !b.windowId) return -1;
-        if (!a.windowId && b.windowId) return 1;
-        return (b.lastAccess || 0) - (a.lastAccess || 0);
+    // Also include currently open unnamed windows
+    chrome.windows.getAll({ populate: true }, windows => {
+        const openUnnamedWindows = windows
+            .filter(window => {
+                // Filter out internal extension windows and windows that already have sessions
+                return !checkInternalSpacesWindows(window.id, false) && 
+                       !spacesService.getSessionByWindowId(window.id);
+            })
+            .map(window => ({
+                sessionId: '', // Use empty string instead of false to avoid "false" string
+                windowId: window.id,
+                name: false, // This will show as "(unnamed window)" in the renderer
+                tabs: window.tabs,
+                history: false,
+                lastAccess: Date.now() // Put open windows at the top
+            }));
+        
+        // Combine saved sessions and open unnamed windows
+        const combinedSpaces = [...openUnnamedWindows, ...allSpaces];
+        
+        // Sort results by last access
+        combinedSpaces.sort((a, b) => {
+            if (a.windowId && !b.windowId) return -1;
+            if (!a.windowId && b.windowId) return 1;
+            return (b.lastAccess || 0) - (a.lastAccess || 0);
+        });
+        
+        callback(combinedSpaces);
     });
-    
-    callback(allSpaces);
 }
 
 function requestTabDetail(tabId, callback) {
-    chrome.tabs.get(tabId, callback);
+    // Convert tabId to integer
+    const numericTabId = parseInt(tabId, 10);
+    chrome.tabs.get(numericTabId, callback);
 }
 
 function handleUpdateSessionName(sessionId, sessionName, callback) {
@@ -596,37 +718,171 @@ function handleSaveNewSession(windowId, sessionName, callback) {
 }
 
 function handleSwitchToSpace(sessionId, windowId, callback) {
-    if (sessionId) {
+    console.log('=== handleSwitchToSpace called ===');
+    console.log('Parameters:', { sessionId, windowId, sessionIdType: typeof sessionId, windowIdType: typeof windowId });
+    
+    // Check if sessionId is a valid session ID (not empty or 'false')
+    if (sessionId && sessionId !== 'false' && sessionId !== '' && sessionId !== 'null') {
+        console.log('Processing sessionId:', sessionId);
         const session = spacesService.getSessionBySessionId(sessionId);
+        console.log('Session found:', session);
         if (session) {
-            spacesService.loadSession(session.id);
+            console.log('Calling handleLoadSession with session.id:', session.id);
+            handleLoadSession(session.id);
+        } else {
+            console.log('No session found for sessionId:', sessionId);
         }
     } else if (windowId) {
-        chrome.windows.update(parseInt(windowId, 10), { focused: true });
+        console.log('Processing windowId:', windowId);
+        const numericWindowId = parseInt(windowId, 10);
+        console.log('Converting windowId to number:', numericWindowId);
+        
+        chrome.windows.update(numericWindowId, { focused: true }, (result) => {
+            if (chrome.runtime.lastError) {
+                console.error('Error focusing window:', chrome.runtime.lastError);
+            } else {
+                console.log('Successfully focused window:', numericWindowId);
+            }
+        });
+    } else {
+        console.log('Neither valid sessionId nor windowId provided');
     }
+    
+    console.log('Calling callback with true');
     callback(true);
 }
 
 function handleMoveTabToSession(tabId, sessionId, callback) {
-    const session = spacesService.getSessionBySessionId(sessionId);
-    if (session) {
-        spacesService.moveTabToSession(tabId, session.id, callback);
-    } else {
-        callback(false);
-    }
+    console.log('=== handleMoveTabToSession called ===');
+    console.log('Parameters:', { tabId, sessionId });
+    
+    // Convert tabId to integer
+    const numericTabId = parseInt(tabId, 10);
+    console.log('Converted tabId to number:', numericTabId);
+    
+    // Get tab details first
+    chrome.tabs.get(numericTabId, tab => {
+        if (chrome.runtime.lastError) {
+            console.error('Error getting tab details:', chrome.runtime.lastError);
+            callback(false);
+            return;
+        }
+        
+        console.log('Tab details:', tab);
+        
+        const session = spacesService.getSessionBySessionId(sessionId);
+        console.log('Session found:', session);
+        
+        if (!session) {
+            console.log('No session found for sessionId:', sessionId);
+            callback(false);
+            return;
+        }
+        
+        // If session is currently open, move tab directly to that window
+        if (session.windowId) {
+            console.log('Moving tab to open session window:', session.windowId);
+            moveTabToWindow(tab, session.windowId, callback);
+            return;
+        }
+        
+        // If session is not open, remove tab from current window and add to saved session
+        console.log('Session not open, removing tab and updating saved session');
+        
+        // Remove tab from current window
+        chrome.tabs.remove(tab.id, () => {
+            if (chrome.runtime.lastError) {
+                console.error('Error removing tab:', chrome.runtime.lastError);
+                callback(false);
+                return;
+            }
+            
+            console.log('Tab removed from current window');
+            
+            // Add tab to saved session in database
+            const newTabs = [tab];
+            session.tabs = session.tabs.concat(newTabs);
+            
+            spacesService.updateSessionTabs(session.id, session.tabs, (result) => {
+                console.log('Session updated in database:', result);
+                callback(result);
+            });
+        });
+    });
+}
+
+function moveTabToWindow(tab, windowId, callback) {
+    console.log('=== moveTabToWindow called ===');
+    console.log('Moving tab:', tab.id, 'to window:', windowId);
+    
+    chrome.tabs.move(tab.id, { windowId: parseInt(windowId, 10), index: -1 }, (result) => {
+        if (chrome.runtime.lastError) {
+            console.error('Error moving tab:', chrome.runtime.lastError);
+            callback(false);
+            return;
+        }
+        
+        console.log('Tab moved successfully:', result);
+        
+        // Queue window events to update sessions manually
+        // (tab move doesn't always trigger tab event listeners)
+        spacesService.queueWindowEvent(tab.windowId);
+        spacesService.queueWindowEvent(windowId);
+        
+        callback(true);
+    });
 }
 
 function handleMoveTabToWindow(tabId, windowId, callback) {
-    chrome.tabs.move(tabId, { windowId: parseInt(windowId, 10) }, callback);
+    console.log('=== handleMoveTabToWindow called ===');
+    console.log('Parameters:', { tabId, windowId });
+    
+    // Convert tabId to integer
+    const numericTabId = parseInt(tabId, 10);
+    console.log('Converted tabId to number:', numericTabId);
+    
+    // Get tab details first
+    chrome.tabs.get(numericTabId, tab => {
+        if (chrome.runtime.lastError) {
+            console.error('Error getting tab details:', chrome.runtime.lastError);
+            callback(false);
+            return;
+        }
+        
+        console.log('Tab details:', tab);
+        moveTabToWindow(tab, windowId, callback);
+    });
 }
 
 function handleAddLinkToSession(url, sessionId, callback) {
+    console.log('=== handleAddLinkToSession called ===');
+    console.log('Parameters:', { url, sessionId });
+    
     const session = spacesService.getSessionBySessionId(sessionId);
-    if (session) {
-        spacesService.addLinkToSession(url, session.id, callback);
-    } else {
+    console.log('Session found:', session);
+    
+    if (!session) {
+        console.log('No session found for sessionId:', sessionId);
         callback(false);
+        return;
     }
+    
+    // If session is currently open, add link directly to that window
+    if (session.windowId) {
+        console.log('Adding link to open session window:', session.windowId);
+        handleAddLinkToWindow(url, session.windowId, callback);
+        return;
+    }
+    
+    // If session is not open, add link to saved session in database
+    console.log('Adding link to saved session in database');
+    const newTabs = [{ url }];
+    session.tabs = session.tabs.concat(newTabs);
+    
+    spacesService.updateSessionTabs(session.id, session.tabs, (result) => {
+        console.log('Session updated in database:', result);
+        callback(result);
+    });
 }
 
 function handleAddLinkToWindow(url, windowId, callback) {
@@ -811,7 +1067,9 @@ function handleAddLinkToNewSession(url, sessionName, callback) {
 }
 
 function handleMoveTabToNewSession(tabId, sessionName, callback) {
-    chrome.tabs.get(tabId, tab => {
+    // Convert tabId to integer
+    const numericTabId = parseInt(tabId, 10);
+    chrome.tabs.get(numericTabId, tab => {
         if (chrome.runtime.lastError) {
             callback(false);
             return;
@@ -827,7 +1085,7 @@ function handleMoveTabToNewSession(tabId, sessionName, callback) {
         
         dbService.createSession(session, result => {
             if (result) {
-                chrome.tabs.remove(tabId);
+                chrome.tabs.remove(numericTabId);
             }
             callback(result);
         });

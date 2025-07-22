@@ -39,8 +39,19 @@ export const spacesRenderer = {
         const listTitle = document.createElement('span');
         const listDetail = document.createElement('span');
 
-        listContainer.setAttribute('data-sessionId', space.sessionId);
-        listContainer.setAttribute('data-windowId', space.windowId);
+        // Only set data attributes if values are meaningful (not empty strings or false)
+        if (space.sessionId && space.sessionId !== '') {
+            listContainer.setAttribute('data-sessionId', space.sessionId);
+        } else {
+            listContainer.setAttribute('data-sessionId', '');
+        }
+        
+        if (space.windowId && space.windowId !== '') {
+            listContainer.setAttribute('data-windowId', space.windowId);
+        } else {
+            listContainer.setAttribute('data-windowId', '');
+        }
+        
         listContainer.setAttribute('data-spaceName', space.name || '');
         listContainer.setAttribute(
             'data-placeholder',
@@ -151,6 +162,11 @@ export const spacesRenderer = {
     },
 
     getDefaultSpaceTitle: space => {
+        // If this is an unnamed window (has windowId but no name), show "(unnamed window)"
+        if (space.windowId && !space.name) {
+            return '(unnamed window)';
+        }
+        
         const count = space.tabs && space.tabs.length;
         if (!count) return '';
         const firstTitle = space.tabs[0].title;

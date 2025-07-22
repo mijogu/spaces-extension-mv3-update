@@ -4,6 +4,7 @@
 import { utils } from './utils.js';
 import { serviceWorkerClient } from './service-worker-client.js';
 import { spacesRenderer } from './spacesRenderer.js';
+import { serviceWorkerHealth } from './service-worker-health.js';
 
 (() => {
     const UNSAVED_SESSION = '(unnamed window)';
@@ -63,8 +64,14 @@ import { spacesRenderer } from './spacesRenderer.js';
                     windowId: parseInt(globalWindowId, 10)
                 }, 5000); // 5 second timeout
             } else {
+                // Get the current window ID if none is provided
+                const currentWindow = await new Promise(resolve => {
+                    chrome.windows.getCurrent(resolve);
+                });
+                
                 space = await serviceWorkerClient.sendMessage({
-                    action: 'requestSpaceDetail'
+                    action: 'requestSpaceDetail',
+                    windowId: currentWindow.id
                 }, 5000); // 5 second timeout
             }
         } catch (error) {
@@ -74,6 +81,10 @@ import { spacesRenderer } from './spacesRenderer.js';
 
         globalCurrentSpace = space;
         console.log('Space details received:', globalCurrentSpace);
+        
+        // Start service worker health monitoring
+        serviceWorkerHealth.startMonitoring();
+        
         renderCommon();
         routeView(action);
     });
@@ -129,6 +140,9 @@ import { spacesRenderer } from './spacesRenderer.js';
     }
 
     async function handleCloseAction() {
+        // Stop service worker health monitoring
+        serviceWorkerHealth.stopMonitoring();
+        
         const opener = utils.getHashVariable('opener', window.location.href);
         if (opener && opener === 'bg') {
             try {
@@ -333,15 +347,36 @@ import { spacesRenderer } from './spacesRenderer.js';
     }
 
     async function handleSwitchAction(selectedSpaceEl) {
+        console.log('=== handleSwitchAction called ===');
+        console.log('selectedSpaceEl:', selectedSpaceEl);
+        console.log('selectedSpaceEl attributes:', {
+            sessionId: selectedSpaceEl.getAttribute('data-sessionId'),
+            windowId: selectedSpaceEl.getAttribute('data-windowId'),
+            spaceName: selectedSpaceEl.getAttribute('data-spaceName'),
+            placeholder: selectedSpaceEl.getAttribute('data-placeholder')
+        });
+        
+        const messageData = {
+            action: 'switchToSpace',
+            sessionId: selectedSpaceEl.getAttribute('data-sessionId'),
+            windowId: selectedSpaceEl.getAttribute('data-windowId'),
+        };
+        
+        console.log('Sending message to service worker:', messageData);
+        
         try {
-            await serviceWorkerClient.sendMessage({
-                action: 'switchToSpace',
-                sessionId: selectedSpaceEl.getAttribute('data-sessionId'),
-                windowId: selectedSpaceEl.getAttribute('data-windowId'),
-            }, 3000);
+            console.log('About to call serviceWorkerClient.sendMessage...');
+            const result = await serviceWorkerClient.sendMessage(messageData, 3000);
+            console.log('Service worker response received:', result);
         } catch (error) {
             console.error('Failed to switch to space:', error);
+            console.error('Error details:', {
+                message: error.message,
+                stack: error.stack
+            });
         }
+        
+        console.log('About to close window...');
         window.close();
     }
 
@@ -409,13 +444,13 @@ import { spacesRenderer } from './spacesRenderer.js';
 
         try {
             if (globalTabId) {
-                if (sessionId) {
+                if (sessionId && sessionId !== '' && sessionId !== 'false') {
                     await serviceWorkerClient.sendMessage({
                         action: 'moveTabToSession',
                         tabId: globalTabId,
                         sessionId: sessionId,
                     }, 3000);
-                } else if (windowId) {
+                } else if (windowId && windowId !== '' && windowId !== 'false') {
                     await serviceWorkerClient.sendMessage({
                         action: 'moveTabToWindow',
                         tabId: globalTabId,
@@ -423,13 +458,13 @@ import { spacesRenderer } from './spacesRenderer.js';
                     }, 3000);
                 }
             } else if (globalUrl) {
-                if (sessionId) {
+                if (sessionId && sessionId !== '' && sessionId !== 'false') {
                     await serviceWorkerClient.sendMessage({
                         action: 'addLinkToSession',
                         url: globalUrl,
                         sessionId: sessionId,
                     }, 3000);
-                } else if (windowId) {
+                } else if (windowId && windowId !== '' && windowId !== 'false') {
                     await serviceWorkerClient.sendMessage({
                         action: 'addLinkToWindow',
                         url: globalUrl,
@@ -468,4 +503,9 @@ import { spacesRenderer } from './spacesRenderer.js';
     // ✅ Retry logic and timeout handling implemented
     // ✅ Async/await patterns for better error handling
     // ✅ Service worker readiness checks implemented
+    
+    // Cleanup on window unload
+    window.addEventListener('beforeunload', () => {
+        serviceWorkerHealth.stopMonitoring();
+    });
 })();

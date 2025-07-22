@@ -56,8 +56,10 @@ class ServiceWorkerClient {
                 clearTimeout(timeout);
                 
                 if (chrome.runtime.lastError) {
+                    console.error('❌ Chrome runtime error:', chrome.runtime.lastError);
                     reject(new Error(chrome.runtime.lastError.message));
                 } else {
+                    console.log('✅ Message sent successfully:', message.action, 'Response:', response);
                     resolve(response);
                 }
             });
