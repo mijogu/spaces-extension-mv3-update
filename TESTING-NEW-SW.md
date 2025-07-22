@@ -13,7 +13,7 @@ The new service worker implementation addresses the "Receiving end does not exis
 
 ## 🧪 Testing Setup
 
-chrome-extension://cenkmofngpohdnkbjdpilgpmbiiljjim/popup-test-new-sw.html
+chrome-extension://cenkmofngpohdnkbjdpilgpmbiiljjim/service-worker-test.html
 
 ### Option 1: Test with Current Extension (Recommended)
 
