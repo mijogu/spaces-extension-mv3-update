@@ -9,18 +9,25 @@
       "default_title": "Spaces"
    },
    "commands": {
-      "spaces-move": {
-         "description": "Move active tab",
+      "spaces-activate": {
+         "description": "Activate the extension",
          "suggested_key": {
-            "default": "Ctrl+Shift+M",
-            "mac": "Command+Shift+M"
+            "default": "Ctrl+L",
+            "mac": "Command+L"
          }
       },
       "spaces-switch": {
          "description": "Switch between spaces",
          "suggested_key": {
-            "default": "Ctrl+Shift+S",
-            "mac": "Command+Shift+S"
+            "default": "Ctrl+Period",
+            "mac": "Command+Period"
+         }
+      },
+      "spaces-move": {
+         "description": "Move active tab",
+         "suggested_key": {
+            "default": "Ctrl+Comma",
+            "mac": "Command+Comma"
          }
       }
    },
