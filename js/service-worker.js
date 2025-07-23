@@ -10,6 +10,7 @@ import { dbService } from './dbService.js';
 let isInitialized = false;
 let initializationPromise = null;
 let lastActivityTime = Date.now();
+let databaseInitializationPromise = null;
 
 // Health monitoring variables
 let heartbeatInterval = null;
@@ -101,8 +102,52 @@ function stopMonitoring() {
     console.log('📡 Service worker monitoring stopped');
 }
 
+// Ensure database is properly initialized before any operations
+async function ensureDatabaseInitialized() {
+    if (databaseInitializationPromise) {
+        return databaseInitializationPromise;
+    }
+    
+    console.log('🔄 Ensuring database is initialized...');
+    
+    databaseInitializationPromise = (async () => {
+        try {
+            // Add a small delay to prevent race conditions
+            await new Promise(resolve => setTimeout(resolve, 100));
+            
+            // Try to open the database to ensure it's ready
+            await dbService.getDb();
+            console.log('✅ Database initialization complete');
+        } catch (error) {
+            console.error('❌ Database initialization failed:', error);
+            // Reset the promise so we can retry
+            databaseInitializationPromise = null;
+            throw error;
+        }
+    })();
+    
+    return databaseInitializationPromise;
+}
+
 // Start monitoring on service worker startup
 startMonitoring();
+
+// Handle unhandled promise rejections
+self.addEventListener('unhandledrejection', (event) => {
+    console.error('❌ Unhandled promise rejection:', event.reason);
+    console.error('❌ Promise:', event.promise);
+    console.error('❌ Stack:', event.reason?.stack);
+    
+    // Prevent the default handling (which would log to console)
+    event.preventDefault();
+    
+    // If it's a database error, try to reset the database initialization
+    if (event.reason && event.reason.name === 'InvalidStateError' && 
+        event.reason.message.includes('version change transaction')) {
+        console.log('🔄 Resetting database initialization due to version change error...');
+        databaseInitializationPromise = null;
+    }
+});
 
 // Lazy initialization - only initialize when first needed
 async function initializeServiceWorker() {
@@ -120,6 +165,11 @@ async function initializeServiceWorker() {
     
     initializationPromise = (async () => {
         try {
+            console.log('🔄 Ensuring database is ready...');
+            // Ensure database is initialized first
+            await ensureDatabaseInitialized();
+            console.log('✅ Database is ready');
+            
             console.log('🔄 Initializing spacesService...');
             // Initialize core services (modules already imported statically)
             await spacesService.initialiseSpaces();
@@ -199,7 +249,11 @@ function setupEventListeners(spacesService, utils) {
     
     // Keyboard shortcuts
     chrome.commands.onCommand.addListener(command => {
-        if (command === 'spaces-move') {
+        console.log('⌨️ Keyboard command received:', command);
+        if (command === 'spaces-activate') {
+            // Activate the extension - show the main popup
+            chrome.action.openPopup();
+        } else if (command === 'spaces-move') {
             showSpacesMoveWindow();
         } else if (command === 'spaces-switch') {
             showSpacesSwitchWindow();
@@ -280,26 +334,44 @@ async function handleMessageWithInitialization(request, sender, sendResponse) {
         // Now handle the actual message
         await handleMessage(request, sender, sendResponse);
         
-    } catch (error) {
-        console.error('Error handling message:', error);
-        
-        // If initialization failed, try to reset and reinitialize
-        if (!isInitialized) {
-            console.log('Attempting to recover from initialization failure...');
-            isInitialized = false;
-            initializationPromise = null;
+            } catch (error) {
+            console.error('Error handling message:', error);
             
-            try {
-                await initializeServiceWorker();
-                await handleMessage(request, sender, sendResponse);
-            } catch (recoveryError) {
-                console.error('Recovery failed:', recoveryError);
-                sendResponse({ error: recoveryError.message });
+            // Handle database-specific errors
+            if (error && error.name === 'InvalidStateError' && 
+                error.message.includes('version change transaction')) {
+                console.log('🔄 Database version change error detected, resetting database initialization...');
+                databaseInitializationPromise = null;
+                
+                // Try to reinitialize the database and retry the operation
+                try {
+                    await ensureDatabaseInitialized();
+                    await handleMessage(request, sender, sendResponse);
+                    return;
+                } catch (dbError) {
+                    console.error('❌ Database reinitialization failed:', dbError);
+                    sendResponse({ error: 'Database initialization failed' });
+                    return;
+                }
             }
-        } else {
-            sendResponse({ error: error.message });
+            
+            // If initialization failed, try to reset and reinitialize
+            if (!isInitialized) {
+                console.log('Attempting to recover from initialization failure...');
+                isInitialized = false;
+                initializationPromise = null;
+                
+                try {
+                    await initializeServiceWorker();
+                    await handleMessage(request, sender, sendResponse);
+                } catch (recoveryError) {
+                    console.error('Recovery failed:', recoveryError);
+                    sendResponse({ error: recoveryError.message });
+                }
+            } else {
+                sendResponse({ error: error.message });
+            }
         }
-    }
 }
 
 // Handle specific messages
@@ -503,22 +575,22 @@ function requestHotkeys(callback) {
     chrome.commands.getAll(commands => {
         let switchStr;
         let moveStr;
-        let spacesStr;
+        let activateStr;
 
         commands.forEach(command => {
             if (command.name === 'spaces-switch') {
                 switchStr = command.shortcut;
             } else if (command.name === 'spaces-move') {
                 moveStr = command.shortcut;
-            } else if (command.name === 'spaces-open') {
-                spacesStr = command.shortcut;
+            } else if (command.name === 'spaces-activate') {
+                activateStr = command.shortcut;
             }
         });
 
         callback({
             switchCode: switchStr,
             moveCode: moveStr,
-            spacesCode: spacesStr,
+            activateCode: activateStr,
         });
     });
 }
@@ -653,7 +725,7 @@ function createSpacesWindow(windowId, editMode) {
         {
             type: 'popup',
             url,
-            height: 500,
+            height: 700,
             width: 1000,
             top: 50,
             left: 50,

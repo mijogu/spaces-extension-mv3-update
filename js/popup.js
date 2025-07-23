@@ -189,9 +189,11 @@ import { spacesRenderer } from './spacesRenderer.js';
             
             const switcherHotkey = document.querySelector('#switcherLink .hotkey');
             const moverHotkey = document.querySelector('#moverLink .hotkey');
+            const allSpacesHotkey = document.querySelector('#allSpacesLink .hotkey');
             
             console.log('switcherHotkey element:', switcherHotkey);
             console.log('moverHotkey element:', moverHotkey);
+            console.log('allSpacesHotkey element:', allSpacesHotkey);
             
             if (switcherHotkey) {
                 const switchText = hotkeys.switchCode ? hotkeys.switchCode : NO_HOTKEY;
@@ -207,17 +209,28 @@ import { spacesRenderer } from './spacesRenderer.js';
             } else {
                 console.error('❌ moverHotkey element not found');
             }
+            if (allSpacesHotkey) {
+                const activateText = hotkeys.activateCode ? hotkeys.activateCode : NO_HOTKEY;
+                allSpacesHotkey.innerHTML = activateText;
+                console.log('✅ Set activate hotkey to:', activateText);
+            } else {
+                console.error('❌ allSpacesHotkey element not found');
+            }
         } catch (error) {
             console.error('Failed to get hotkeys:', error);
             // Set default values on error
             const switcherHotkey = document.querySelector('#switcherLink .hotkey');
             const moverHotkey = document.querySelector('#moverLink .hotkey');
+            const allSpacesHotkey = document.querySelector('#allSpacesLink .hotkey');
             
             if (switcherHotkey) {
                 switcherHotkey.innerHTML = NO_HOTKEY;
             }
             if (moverHotkey) {
                 moverHotkey.innerHTML = NO_HOTKEY;
+            }
+            if (allSpacesHotkey) {
+                allSpacesHotkey.innerHTML = NO_HOTKEY;
             }
         }
 
@@ -535,6 +548,7 @@ import { spacesRenderer } from './spacesRenderer.js';
     
     // Cleanup on window unload
     window.addEventListener('beforeunload', () => {
-        serviceWorkerHealth.stopMonitoring();
+        // Cleanup any resources if needed
+        console.log('Popup window unloading, cleanup complete');
     });
 })();
