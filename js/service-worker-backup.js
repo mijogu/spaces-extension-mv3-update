@@ -11,10 +11,6 @@ let isInitialized = false;
 let initializationPromise = null;
 let lastActivityTime = Date.now();
 
-// Health monitoring variables
-let heartbeatInterval = null;
-let activityCheckInterval = null;
-
 // Window tracking for internal spaces windows
 let spacesOpenWindowId = false;
 let spacesPopupWindowId = false;
@@ -38,16 +34,12 @@ function checkInactivity() {
 // Service worker lifecycle events
 chrome.runtime.onStartup.addListener(() => {
     console.log('🔄 Service worker starting up...');
-    // Restart monitoring
-    startMonitoring();
     // Initialize on startup to ensure service worker is ready
     initializeServiceWorker();
 });
 
 chrome.runtime.onInstalled.addListener((details) => {
     console.log('📦 Service worker installed...', details.reason);
-    // Start monitoring
-    startMonitoring();
     // Initialize on both install and update to ensure service worker is ready
     initializeServiceWorker();
 });
@@ -62,47 +54,15 @@ self.addEventListener('activate', (event) => {
 // Handle service worker termination
 self.addEventListener('beforeunload', (event) => {
     console.log('💀 Service worker being terminated...');
-    // Stop monitoring
-    stopMonitoring();
     // Save any critical state if needed
 });
 
-// Start monitoring intervals
-function startMonitoring() {
-    // Clear any existing intervals
-    if (heartbeatInterval) clearInterval(heartbeatInterval);
-    if (activityCheckInterval) clearInterval(activityCheckInterval);
-    
-    // Start heartbeat interval (25 seconds)
-    heartbeatInterval = setInterval(() => {
-        updateActivity();
-        console.log('💓 Service worker heartbeat - last activity:', new Date(lastActivityTime).toISOString());
-    }, 25000);
-    
-    // Start activity check interval (30 seconds)
-    activityCheckInterval = setInterval(() => {
-        checkInactivity();
-        console.log('📊 Activity check - service worker status:', { isInitialized, lastActivity: new Date(lastActivityTime).toISOString() });
-    }, 30000);
-    
-    console.log('📡 Service worker monitoring started');
-}
-
-// Stop monitoring
-function stopMonitoring() {
-    if (heartbeatInterval) {
-        clearInterval(heartbeatInterval);
-        heartbeatInterval = null;
-    }
-    if (activityCheckInterval) {
-        clearInterval(activityCheckInterval);
-        activityCheckInterval = null;
-    }
-    console.log('📡 Service worker monitoring stopped');
-}
-
-// Start monitoring on service worker startup
-startMonitoring();
+// Periodic activity check to keep service worker alive
+setInterval(() => {
+    updateActivity();
+    checkInactivity();
+    console.log('💓 Service worker heartbeat - last activity:', new Date(lastActivityTime).toISOString());
+}, 60000); // Check every minute
 
 // Lazy initialization - only initialize when first needed
 async function initializeServiceWorker() {
@@ -227,17 +187,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     
     // Handle simple messages that don't need initialization
     if (request.action === 'ping') {
-        console.log('🏓 Ping received - service worker status:', { 
-            initialized: isInitialized, 
-            lastActivity: new Date(lastActivityTime).toISOString(),
-            monitoring: !!(heartbeatInterval && activityCheckInterval)
-        });
-        sendResponse({ 
-            status: 'ready', 
-            initialized: isInitialized, 
-            lastActivity: lastActivityTime,
-            monitoring: !!(heartbeatInterval && activityCheckInterval)
-        });
+        console.log('🏓 Ping received - service worker status:', { initialized: isInitialized, lastActivity: new Date(lastActivityTime).toISOString() });
+        sendResponse({ status: 'ready', initialized: isInitialized, lastActivity: lastActivityTime });
         return false;
     }
     
