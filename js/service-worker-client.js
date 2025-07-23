@@ -75,7 +75,10 @@ class ServiceWorkerClient {
     async isReady() {
         try {
             const response = await this.sendMessage({ action: 'ping' }, 2000);
-            return response && response.status === 'ready';
+            console.log('🔍 Ping response:', response);
+            const isReady = response && response.status === 'ready' && response.initialized === true;
+            console.log('🔍 Service worker ready check:', { status: response?.status, initialized: response?.initialized, isReady });
+            return isReady;
         } catch (error) {
             console.log('Service worker not ready:', error.message);
             return false;
@@ -83,16 +86,26 @@ class ServiceWorkerClient {
     }
 
     // Wait for service worker to be ready
-    async waitForReady(maxWaitMs = 10000) {
+    async waitForReady(maxWaitMs = 15000) {
         const startTime = Date.now();
+        let attempts = 0;
+        
+        console.log('⏳ Waiting for service worker to be ready...');
         
         while (Date.now() - startTime < maxWaitMs) {
+            attempts++;
+            console.log(`🔍 Service worker readiness check attempt ${attempts}...`);
+            
             if (await this.isReady()) {
+                console.log('✅ Service worker is ready!');
                 return true;
             }
-            await this._wait(500);
+            
+            console.log('⏸️ Service worker not ready yet, waiting 1 second...');
+            await this._wait(1000);
         }
         
+        console.error('❌ Service worker not ready within timeout');
         throw new Error('Service worker not ready within timeout');
     }
 

@@ -4,7 +4,7 @@
 import { utils } from './utils.js';
 import { serviceWorkerClient } from './service-worker-client.js';
 import { spacesRenderer } from './spacesRenderer.js';
-import { serviceWorkerHealth } from './service-worker-health.js';
+// service-worker-health.js moved to archive - functionality integrated into main service worker
 
 (() => {
     const UNSAVED_SESSION = '(unnamed window)';
@@ -22,16 +22,18 @@ import { serviceWorkerHealth } from './service-worker-health.js';
      */
 
     document.addEventListener('DOMContentLoaded', async () => {
+        console.log('🚀 Popup DOM loaded, starting initialization...');
+        
         // BREAKING_CHANGE: chrome.extension.getBackgroundPage() is not supported in MV3
         // Using chrome.runtime.sendMessage instead to communicate with service worker
         
         // Add service worker connection check with retry logic
         try {
-            console.log('Checking service worker readiness...');
+            console.log('🔍 Checking service worker readiness...');
             await serviceWorkerClient.waitForReady(10000); // Wait up to 10 seconds
-            console.log('Service worker is ready');
+            console.log('✅ Service worker is ready');
         } catch (error) {
-            console.error('Service worker not ready:', error);
+            console.error('❌ Service worker not ready:', error);
             // Show error message to user
             const errorDiv = document.createElement('div');
             errorDiv.textContent = 'Extension is initializing, please try again in a moment.';
@@ -58,16 +60,20 @@ import { serviceWorkerHealth } from './service-worker-health.js';
         // Request space data from service worker with robust error handling
         let space = null;
         try {
+            console.log('🏠 Requesting space details...');
             if (globalWindowId) {
+                console.log('Using provided windowId:', globalWindowId);
                 space = await serviceWorkerClient.sendMessage({
                     action: 'requestSpaceDetail',
                     windowId: parseInt(globalWindowId, 10)
                 }, 5000); // 5 second timeout
             } else {
+                console.log('Getting current window ID...');
                 // Get the current window ID if none is provided
                 const currentWindow = await new Promise(resolve => {
                     chrome.windows.getCurrent(resolve);
                 });
+                console.log('Current window ID:', currentWindow.id);
                 
                 space = await serviceWorkerClient.sendMessage({
                     action: 'requestSpaceDetail',
@@ -75,15 +81,14 @@ import { serviceWorkerHealth } from './service-worker-health.js';
                 }, 5000); // 5 second timeout
             }
         } catch (error) {
-            console.error('Failed to get space details:', error);
+            console.error('❌ Failed to get space details:', error);
             space = null;
         }
 
         globalCurrentSpace = space;
-        console.log('Space details received:', globalCurrentSpace);
+        console.log('🏠 Space details received:', globalCurrentSpace);
         
-        // Start service worker health monitoring
-        serviceWorkerHealth.startMonitoring();
+        // Service worker health monitoring is handled by the main service worker
         
         renderCommon();
         routeView(action);
@@ -104,11 +109,24 @@ import { serviceWorkerHealth } from './service-worker-health.js';
      */
 
     function renderCommon() {
-        document.getElementById(
-            'activeSpaceTitle'
-        ).value = globalCurrentSpace && globalCurrentSpace.name
+        console.log('🎨 renderCommon called');
+        console.log('globalCurrentSpace:', globalCurrentSpace);
+        console.log('globalCurrentSpace.name:', globalCurrentSpace?.name);
+        
+        const activeSpaceTitleEl = document.getElementById('activeSpaceTitle');
+        console.log('activeSpaceTitle element:', activeSpaceTitleEl);
+        
+        const spaceName = globalCurrentSpace && globalCurrentSpace.name
             ? globalCurrentSpace.name
             : UNSAVED_SESSION;
+        console.log('Setting space name to:', spaceName);
+        
+        if (activeSpaceTitleEl) {
+            activeSpaceTitleEl.value = spaceName;
+            console.log('✅ Space name set successfully');
+        } else {
+            console.error('❌ activeSpaceTitle element not found');
+        }
 
         document.querySelector('body').onkeyup = e => {
             // listen for escape key
@@ -140,8 +158,7 @@ import { serviceWorkerHealth } from './service-worker-health.js';
     }
 
     async function handleCloseAction() {
-        // Stop service worker health monitoring
-        serviceWorkerHealth.stopMonitoring();
+        // Service worker health monitoring is handled by the main service worker
         
         const opener = utils.getHashVariable('opener', window.location.href);
         if (opener && opener === 'bg') {
@@ -162,21 +179,33 @@ import { serviceWorkerHealth } from './service-worker-health.js';
      */
 
     async function renderMainCard() {
-        console.log('renderMainCard called');
+        console.log('🎨 renderMainCard called');
         
         // Request hotkeys from service worker with robust error handling
         try {
+            console.log('🔑 Requesting hotkeys from service worker...');
             const hotkeys = await serviceWorkerClient.sendMessage({ action: 'requestHotkeys' }, 3000);
-            console.log('Hotkeys received:', hotkeys);
+            console.log('✅ Hotkeys received:', hotkeys);
             
             const switcherHotkey = document.querySelector('#switcherLink .hotkey');
             const moverHotkey = document.querySelector('#moverLink .hotkey');
             
+            console.log('switcherHotkey element:', switcherHotkey);
+            console.log('moverHotkey element:', moverHotkey);
+            
             if (switcherHotkey) {
-                switcherHotkey.innerHTML = hotkeys.switchCode ? hotkeys.switchCode : NO_HOTKEY;
+                const switchText = hotkeys.switchCode ? hotkeys.switchCode : NO_HOTKEY;
+                switcherHotkey.innerHTML = switchText;
+                console.log('✅ Set switcher hotkey to:', switchText);
+            } else {
+                console.error('❌ switcherHotkey element not found');
             }
             if (moverHotkey) {
-                moverHotkey.innerHTML = hotkeys.moveCode ? hotkeys.moveCode : NO_HOTKEY;
+                const moveText = hotkeys.moveCode ? hotkeys.moveCode : NO_HOTKEY;
+                moverHotkey.innerHTML = moveText;
+                console.log('✅ Set mover hotkey to:', moveText);
+            } else {
+                console.error('❌ moverHotkey element not found');
             }
         } catch (error) {
             console.error('Failed to get hotkeys:', error);
