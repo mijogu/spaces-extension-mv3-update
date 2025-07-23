@@ -120,15 +120,22 @@ async function initializeServiceWorker() {
     
     initializationPromise = (async () => {
         try {
+            console.log('🔄 Initializing spacesService...');
             // Initialize core services (modules already imported statically)
             await spacesService.initialiseSpaces();
-            spacesService.initialiseTabHistory();
+            console.log('✅ spacesService.initialiseSpaces() completed');
             
+            console.log('🔄 Initializing tab history...');
+            spacesService.initialiseTabHistory();
+            console.log('✅ Tab history initialized');
+            
+            console.log('🔄 Setting up event listeners...');
             // Set up event listeners
             setupEventListeners(spacesService, utils);
+            console.log('✅ Event listeners set up');
             
             isInitialized = true;
-            console.log('Service worker initialization complete');
+            console.log('✅ Service worker initialization complete');
             
             // Store initialization state
             chrome.storage.local.set({ 
@@ -137,7 +144,8 @@ async function initializeServiceWorker() {
             });
             
         } catch (error) {
-            console.error('Service worker initialization failed:', error);
+            console.error('❌ Service worker initialization failed:', error);
+            console.error('❌ Error stack:', error.stack);
             isInitialized = false;
             initializationPromise = null;
             throw error;
@@ -230,11 +238,22 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         console.log('🏓 Ping received - service worker status:', { 
             initialized: isInitialized, 
             lastActivity: new Date(lastActivityTime).toISOString(),
-            monitoring: !!(heartbeatInterval && activityCheckInterval)
+            monitoring: !!(heartbeatInterval && activityCheckInterval),
+            initializationPromise: !!initializationPromise
         });
+        
+        // If not initialized, try to initialize now
+        if (!isInitialized && !initializationPromise) {
+            console.log('🏓 Service worker not initialized, attempting initialization...');
+            initializeServiceWorker().catch(error => {
+                console.error('🏓 Initialization failed during ping:', error);
+            });
+        }
+        
         sendResponse({ 
             status: 'ready', 
             initialized: isInitialized, 
+            isReady: isInitialized, // Add isReady field for client compatibility
             lastActivity: lastActivityTime,
             monitoring: !!(heartbeatInterval && activityCheckInterval)
         });
