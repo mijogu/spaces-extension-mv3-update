@@ -15,6 +15,7 @@ A powerful Chrome extension for intuitive tab and window management using "space
 ## 🚀 Key Improvements
 
 ### **Manifest V3 Migration**
+
 - ✅ Complete migration from MV2 to MV3
 - ✅ Service worker architecture with proper lifecycle management
 - ✅ ES modules throughout the codebase
@@ -22,6 +23,7 @@ A powerful Chrome extension for intuitive tab and window management using "space
 - ✅ Modern Chrome extension best practices
 
 ### **Reliability & Performance**
+
 - ✅ **Health Monitoring System**: Continuous service worker monitoring
 - ✅ **Lazy Initialization**: Service worker only initializes when needed
 - ✅ **Activity Tracking**: Prevents service worker from "going dark"
@@ -29,6 +31,7 @@ A powerful Chrome extension for intuitive tab and window management using "space
 - ✅ **State Persistence**: Reliable state management with chrome.storage
 
 ### **Testing & Quality**
+
 - ✅ **Comprehensive Test Suite**: 8 reliability tests covering all scenarios
 - ✅ **Real-time Monitoring**: Live service worker health dashboard
 - ✅ **Automated Testing**: Jest-based unit and integration tests
@@ -43,6 +46,7 @@ A powerful Chrome extension for intuitive tab and window management using "space
 ## 🛠️ Installation
 
 ### **For Users**
+
 1. Download the extension files
 2. Open Chrome and navigate to `chrome://extensions/`
 3. Enable "Developer mode" (toggle in top right)
@@ -50,6 +54,7 @@ A powerful Chrome extension for intuitive tab and window management using "space
 5. The extension icon should appear in your toolbar
 
 ### **For Developers**
+
 ```bash
 # Clone the repository
 git clone <repository-url>
@@ -70,6 +75,7 @@ npm test
 ## 🧪 Testing
 
 ### **Automated Tests**
+
 ```bash
 # Run all tests
 npm test
@@ -82,13 +88,16 @@ npm run test:coverage
 ```
 
 ### **Manual Testing**
+
 1. **Open the test page**: `service-worker-reliability-test.html`
 2. **Run reliability tests**: Click "Run All Tests" to validate service worker health
 3. **Test functionality**: Use the extension popup and keyboard shortcuts
 4. **Monitor logs**: Check browser console for detailed operation logs
 
 ### **Test Coverage**
-- ✅ **Service Worker Reliability**: 8 comprehensive tests
+
+- ✅ **Service Worker Reliability**: 8 comprehensive tests (manual via test page)
+- ✅ **Utility Functions**: Hash parsing and hotkey handling (automated)
 - ✅ **Basic Communication**: Ping/pong functionality
 - ✅ **Initialization**: Lazy loading and error recovery
 - ✅ **State Persistence**: Activity tracking and state management
@@ -99,6 +108,7 @@ npm run test:coverage
 ## 🏗️ Architecture
 
 ### **Service Worker (MV3)**
+
 ```javascript
 // Lazy initialization - only when needed
 async function initializeServiceWorker() {
@@ -117,6 +127,7 @@ function startMonitoring() {
 ```
 
 ### **Message Passing**
+
 ```javascript
 // CSP-compliant communication
 chrome.runtime.sendMessage({ action: 'requestHotkeys' }, response => {
@@ -125,6 +136,7 @@ chrome.runtime.sendMessage({ action: 'requestHotkeys' }, response => {
 ```
 
 ### **State Management**
+
 ```javascript
 // Persistent state with chrome.storage
 chrome.storage.local.set({ 
@@ -151,9 +163,11 @@ spaces-extension-mv3/
 │   ├── dbService.js                        # Database operations
 │   ├── utils.js                            # Utility functions
 │   └── tests/                              # Test suite
-│       ├── service-worker-reliability-test.js
-│       ├── reliability-test-ui.js
-│       └── import-test.js
+│       ├── service-worker-reliability-test.js  # Manual reliability tests
+│       ├── reliability-test-ui.js              # Test UI handler
+│       ├── import-test.js                      # Import functionality tests
+│       ├── utils.test.js                       # Automated utility tests
+│       └── setup.js                            # Jest test setup
 ├── archive/                                # Archived files
 ├── css/                                    # Stylesheets
 ├── img/                                    # Extension icons
@@ -163,6 +177,7 @@ spaces-extension-mv3/
 ## 🔧 Configuration
 
 ### **Service Worker Settings**
+
 ```javascript
 // Monitoring intervals
 const HEARTBEAT_INTERVAL = 25000;    // 25 seconds
@@ -171,6 +186,7 @@ const MAX_INACTIVE_TIME = 300000;    // 5 minutes
 ```
 
 ### **Keyboard Shortcuts**
+
 - **Switch Spaces**: `Ctrl+Shift+S` (Windows/Linux) or `Cmd+Shift+S` (Mac)
 - **Move Tab**: `Ctrl+Shift+M` (Windows/Linux) or `Cmd+Shift+M` (Mac)
 
@@ -187,21 +203,25 @@ const MAX_INACTIVE_TIME = 300000;    // 5 minutes
 ### **Common Issues**
 
 #### **Extension Not Responding**
+
 - Check service worker health via test page
 - Reload extension in chrome://extensions/
 - Check console for error messages
 
 #### **Hotkeys Not Working**
+
 - Verify keyboard shortcuts in chrome://extensions/shortcuts
 - Check if service worker is initialized
 - Run reliability tests to validate functionality
 
 #### **Spaces Not Saving**
+
 - Check chrome.storage permissions
 - Verify database initialization
 - Check console for storage errors
 
 ### **Debugging Tools**
+
 1. **Test Page**: Use `service-worker-reliability-test.html`
 2. **Console Logs**: Monitor heartbeat and activity logs
 3. **Chrome DevTools**: Inspect service worker in Application tab
@@ -222,6 +242,7 @@ const MAX_INACTIVE_TIME = 300000;    // 5 minutes
 5. **Open** a Pull Request
 
 ### **Development Guidelines**
+
 - Follow MV3 best practices
 - Add tests for new functionality
 - Ensure CSP compliance
@@ -246,7 +267,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-**Version**: 1.1.3  
-**Last Updated**: July 2024  
-**Status**: ✅ Production Ready  
-**MV3 Compliance**: ✅ Complete 
+**Version**: 1.1.3
+**Last Updated**: July 2025
+**Status**: ✅ Production Ready
+**MV3 Compliance**: ✅ Complete
