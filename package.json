@@ -23,13 +23,18 @@
   },
   "jest": {
     "testEnvironment": "jsdom",
-    "setupFilesAfterEnv": ["<rootDir>/tests/setup.js"],
+    "setupFilesAfterEnv": ["<rootDir>/js/tests/setup.js"],
+    "testMatch": [
+      "<rootDir>/js/tests/**/*.test.js",
+      "<rootDir>/js/tests/**/*.spec.js"
+    ],
     "moduleNameMapper": {
       "^@/(.*)$": "<rootDir>/js/$1"
     },
     "collectCoverageFrom": [
       "js/**/*.js",
-      "!js/db.js"
+      "!js/db.js",
+      "!js/tests/**/*.js"
     ]
   }
 } 
