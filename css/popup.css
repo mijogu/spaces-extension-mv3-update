@@ -10,9 +10,9 @@ a {
     outline: none;
     color: #3889ab;
 }
-#popupContainer {
+/* #popupContainer {
     max-width: 310px;
-}
+} */
 #header {
     display: flex;
     align-items: baseline;
